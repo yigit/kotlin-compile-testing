@@ -3,6 +3,9 @@ package com.tschuchort.compiletesting
 import org.assertj.core.api.Assertions
 import org.jetbrains.kotlin.ksp.KotlinSymbolProcessingCommandLineProcessor
 import org.jetbrains.kotlin.ksp.KotlinSymbolProcessingComponentRegistrar
+import org.jetbrains.kotlin.ksp.processing.CodeGenerator
+import org.jetbrains.kotlin.ksp.processing.Resolver
+import org.jetbrains.kotlin.ksp.processing.SymbolProcessor
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -26,7 +29,7 @@ class KspProcessorTest {
         val processorClasspath = temporaryFolder.newFolder("symbol-processor").apply {
             resolve("META-INF/services/org.jetbrains.kotlin.ksp.processing.SymbolProcessor").apply {
                 parentFile.mkdirs()
-                writeText(KspTestProcessor::class.java.canonicalName)
+                writeText(KspTestProcessor::class.java.typeName)
             }
         }
         val kspOptions = listOf(
@@ -47,4 +50,22 @@ class KspProcessorTest {
         Assertions.assertThat(result.exitCode).isEqualTo(KotlinCompilation.ExitCode.OK)
     }
 
+    class KspTestProcessor : SymbolProcessor {
+        lateinit var codeGenerator: CodeGenerator
+        override fun finish() {
+        }
+
+        override fun init(options: Map<String, String>, kotlinVersion: KotlinVersion, codeGenerator: CodeGenerator) {
+            this.codeGenerator = codeGenerator
+        }
+
+        override fun process(resolver: Resolver) {
+            resolver.getSymbolsWithAnnotation(ProcessElem::class.java.canonicalName).forEach {
+                codeGenerator.createNewFile("com.example.generated", "Generated").writeText("""
+                package com.example.generated
+                class Generated {}
+            """.trimIndent())
+            }
+        }
+    }
 }
