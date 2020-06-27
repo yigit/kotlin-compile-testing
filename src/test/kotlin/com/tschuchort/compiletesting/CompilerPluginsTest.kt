@@ -91,17 +91,15 @@ class CompilerPluginsTest {
 				}
 				"""
         )
-//        val options = KspOptions.Builder().apply {
-//            processors.add(KspTestProcessor::class.qualifiedName.toString())
-//        }.build()
-
-        val classpathWithTestProcessor = ClassGraph().classpathFiles.first {
-            it.walkTopDown().any {
-                it.name.startsWith("KspTestProcessor")
+        // create a fake classpath that references our symbol processor
+        val processorClasspath = temporaryFolder.newFolder("symbol-processor").apply {
+            resolve("META-INF/services/org.jetbrains.kotlin.ksp.processing.SymbolProcessor").apply {
+                parentFile.mkdirs()
+                writeText(KspTestProcessor::class.java.canonicalName)
             }
         }
         val kspOptions = listOf(
-            PluginOption("org.jetbrains.kotlin.ksp", "apclasspath", ClassGraph().classpath),
+            PluginOption("org.jetbrains.kotlin.ksp", "apclasspath", processorClasspath.path),
             PluginOption("org.jetbrains.kotlin.ksp", "classes", temporaryFolder.newFolder("outClasses").path),
             PluginOption("org.jetbrains.kotlin.ksp", "sources", temporaryFolder.newFolder("outSources").path)
         )
@@ -111,7 +109,7 @@ class CompilerPluginsTest {
             sources = listOf(kSource)
             annotationProcessors = emptyList()
             compilerPlugins = listOf(KotlinSymbolProcessingComponentRegistrar())
-            inheritClassPath = true
+            inheritClassPath = false
             pluginOptions = kspOptions
             commandLineProcessors = listOf(KotlinSymbolProcessingCommandLineProcessor())
         }.compile()
