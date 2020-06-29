@@ -15,19 +15,15 @@ import org.junit.runners.JUnit4
 
 @RunWith(JUnit4::class)
 class KspTest {
-    @Rule
-    @JvmField
-    val processorRule = DelegatingSymbolProcessorRule()
-
     @Test
     fun failedKspTest() {
         val result = KotlinCompilation().apply {
             sources = listOf(DUMMY_KOTLIN_SRC)
-            symbolProcessor(processorRule.delegateTo(object : AbstractSymbolProcessor() {
+            symbolProcessors(object : AbstractSymbolProcessor() {
                 override fun process(resolver: Resolver) {
                     throw RuntimeException("intentional fail")
                 }
-            }))
+            })
         }.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.INTERNAL_ERROR)
         assertThat(result.messages).contains("intentional fail")
@@ -38,7 +34,7 @@ class KspTest {
         val instance = mock<SymbolProcessor>()
         val result = KotlinCompilation().apply {
             sources = listOf(DUMMY_KOTLIN_SRC)
-            symbolProcessor(processorRule.delegateTo(instance))
+            symbolProcessors(instance)
         }.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.OK)
         instance.inOrder {
@@ -92,7 +88,7 @@ class KspTest {
         }
         val result = KotlinCompilation().apply {
             sources = listOf(annotation, targetClass)
-            symbolProcessor(processorRule.delegateTo(processor))
+            symbolProcessors(processor)
         }.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.OK)
     }
@@ -110,7 +106,7 @@ class KspTest {
         )
         val result = KotlinCompilation().apply {
             sources = listOf(source)
-            symbolProcessor(Write_foo_bar_A::class.java, Write_foo_bar_B::class.java)
+            symbolProcessors(Write_foo_bar_A::class.java, Write_foo_bar_B::class.java)
         }.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.OK)
     }
