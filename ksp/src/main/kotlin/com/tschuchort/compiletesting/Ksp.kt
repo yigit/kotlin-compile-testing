@@ -20,9 +20,9 @@ private fun KotlinCompilation.initAndGetKspConfig(): KspConfiguration {
     config.sourcesOurDir.mkdirs()
     config.syntheticSources.mkdirs()
     val kspOptions = listOf(
-        PluginOption(KSP_PLUGIN_ID, "apclasspath", config.syntheticSources.path),
-        PluginOption(KSP_PLUGIN_ID, "classes", config.classesOutDir.path),
-        PluginOption(KSP_PLUGIN_ID, "sources", config.sourcesOurDir.path)
+            PluginOption(KSP_PLUGIN_ID, "apclasspath", config.syntheticSources.path),
+            PluginOption(KSP_PLUGIN_ID, "classes", config.classesOutDir.path),
+            PluginOption(KSP_PLUGIN_ID, "sources", config.sourcesOurDir.path)
     )
     compilerPlugins = compilerPlugins + KotlinSymbolProcessingComponentRegistrar()
     commandLineProcessors = commandLineProcessors + listOf(KotlinSymbolProcessingCommandLineProcessor())
@@ -31,9 +31,29 @@ private fun KotlinCompilation.initAndGetKspConfig(): KspConfiguration {
 }
 
 fun KotlinCompilation.symbolProcessors(
-    vararg processors: Class<out SymbolProcessor>
+        vararg processors: SymbolProcessor
 ) {
     check(processors.isNotEmpty()) {
+        "Must provide at least 1 symbol processor"
+    }
+    val config = initAndGetKspConfig()
+    val syntheticProcessor = processors.map { symbol ->
+        DelegatingProcessorGenerator.generate(
+                config.syntheticSources,
+                symbol
+        )
+    }
+    return symbolProcessors(syntheticProcessor)
+}
+
+fun KotlinCompilation.symbolProcessors(
+        vararg processors: Class<out SymbolProcessor>
+) = symbolProcessors(processors.map { it.typeName })
+
+private fun KotlinCompilation.symbolProcessors(
+        cannonicalProcessors: List<String>
+) {
+    check(cannonicalProcessors.isNotEmpty()) {
         "Must provide at least 1 symbol processor"
     }
     val config = initAndGetKspConfig()
@@ -48,11 +68,9 @@ fun KotlinCompilation.symbolProcessors(
             } else {
                 emptyList()
             }
-            val processorNames = existing + processors.map {
-                it.typeName
-            }
+            val processorNames = existing + cannonicalProcessors
             writeText(
-                processorNames.joinToString(System.lineSeparator())
+                    processorNames.joinToString(System.lineSeparator())
             )
         }
     }
@@ -60,7 +78,7 @@ fun KotlinCompilation.symbolProcessors(
 }
 
 private data class KspConfiguration(
-    val workingDir: File
+        val workingDir: File
 ) {
     val classesOutDir = workingDir.resolve("classesOutput")
     val sourcesOurDir = workingDir.resolve("sourcesOutput")

@@ -34,6 +34,21 @@ class KspTest {
     }
 
     @Test
+    fun instanceApi() {
+        val instance = mock<SymbolProcessor>()
+        val result = KotlinCompilation().apply {
+            sources = listOf(DUMMY_KOTLIN_SRC)
+            symbolProcessors(instance)
+        }.compile()
+        assertThat(result.exitCode).isEqualTo(ExitCode.OK)
+        instance.inOrder {
+            verify().init(any(), any(), any())
+            verify().process(any())
+            verify().finish()
+        }
+    }
+
+    @Test
     fun processorIsCalled() {
         val instance = mock<SymbolProcessor>()
         val result = KotlinCompilation().apply {

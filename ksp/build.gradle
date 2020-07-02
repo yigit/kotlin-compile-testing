@@ -41,12 +41,15 @@ repositories {
 }
 
 dependencies {
-    // this gets swapped w/ the included build
+    // we declare a dependency on the main project w/o a version.
+    // the main build is an included build so Gradle resolves this to the actual module (not a prebuilt)
     api("com.github.tschuchortdev:kotlin-compile-testing")
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     implementation "org.jetbrains.kotlin:kotlin-symbol-processing-api:$ksp_version"
     implementation "org.jetbrains.kotlin:kotlin-ksp:$ksp_version"
     implementation "org.jetbrains.kotlin:kotlin-compiler-embeddable:$kotlin_version"
+    implementation "org.javassist:javassist:3.27.0-GA"
+
 
     testImplementation group: 'junit', name: 'junit', version: '4.12'
     testImplementation "org.assertj:assertj-core:3.11.1"
