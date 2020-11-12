@@ -37,6 +37,8 @@ dependencies {
     // an obsolete version of Guava
     implementation "org.jetbrains.kotlin:kotlin-compiler-embeddable:$kotlin_version"
     implementation "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable:$kotlin_version"
+    implementation "com.google.devtools.ksp:symbol-processing-api:$ksp_version"
+    implementation "com.google.devtools.ksp:symbol-processing:$ksp_version"
 }
 
 compileKotlin {

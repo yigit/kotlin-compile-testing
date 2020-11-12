@@ -1,13 +1,14 @@
 /**
  * Adds support for KSP (https://goo.gle/ksp).
  */
-package com.tschuchort.compiletesting
+package com.facebook.buck.jvm.java.javax.com.tschuchort.compiletesting
 
 import com.google.devtools.ksp.AbstractKotlinSymbolProcessingExtension
 import com.google.devtools.ksp.KspOptions
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.impl.MessageCollectorBasedKSPLogger
+import com.tschuchort.compiletesting.KotlinCompilation
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.com.intellij.mock.MockProject
@@ -44,13 +45,13 @@ var KotlinCompilation.kspArgs: MutableMap<String, String>
         registrar.options = value
     }
 
-private val KotlinCompilation.kspJavaSourceDir: File
+internal val KotlinCompilation.kspJavaSourceDir: File
     get() = kspSourcesDir.resolve("java")
 
-private val KotlinCompilation.kspKotlinSourceDir: File
+internal val KotlinCompilation.kspKotlinSourceDir: File
     get() = kspSourcesDir.resolve("kotlin")
 
-private val KotlinCompilation.kspResourceDir: File
+internal val KotlinCompilation.kspResourceDir: File
     get() = kspSourcesDir.resolve("resource")
 
 /**
@@ -87,7 +88,7 @@ private class KspTestExtension(
 /**
  * Registers the [KspTestExtension] to load the given list of processors.
  */
-private class KspCompileTestingComponentRegistrar(
+internal class KspCompileTestingComponentRegistrar(
     private val compilation: KotlinCompilation
 ) : ComponentRegistrar {
     var processors = emptyList<SymbolProcessor>()
@@ -131,11 +132,17 @@ private class KspCompileTestingComponentRegistrar(
 /**
  * Gets the test registrar from the plugin list or adds if it does not exist.
  */
-private fun KotlinCompilation.getKspRegistrar(): KspCompileTestingComponentRegistrar {
+internal fun KotlinCompilation.getKspRegistrar(): KspCompileTestingComponentRegistrar {
     compilerPlugins.firstIsInstanceOrNull<KspCompileTestingComponentRegistrar>()?.let {
         return it
     }
     val kspRegistrar = KspCompileTestingComponentRegistrar(this)
     compilerPlugins = compilerPlugins + kspRegistrar
     return kspRegistrar
+}
+
+internal fun KotlinCompilation.removeKsp() {
+    compilerPlugins = compilerPlugins.filterNot {
+        it is KspCompileTestingComponentRegistrar
+    }
 }

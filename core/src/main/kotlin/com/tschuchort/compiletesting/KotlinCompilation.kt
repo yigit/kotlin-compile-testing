@@ -17,6 +17,9 @@
 package com.tschuchort.compiletesting
 
 import com.facebook.buck.jvm.java.javax.SynchronizedToolProvider
+import com.facebook.buck.jvm.java.javax.com.tschuchort.compiletesting.*
+import com.facebook.buck.jvm.java.javax.com.tschuchort.compiletesting.kspJavaSourceDir
+import com.facebook.buck.jvm.java.javax.com.tschuchort.compiletesting.removeKsp
 import org.jetbrains.kotlin.base.kapt3.AptMode
 import org.jetbrains.kotlin.base.kapt3.KaptFlag
 import org.jetbrains.kotlin.base.kapt3.KaptOptions
@@ -603,7 +606,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 		kaptKotlinGeneratedDir.mkdirs()
 
 		// write given sources to working directory
-		val sourceFiles = sources.map { it.writeIfNeeded(sourcesDir) }
+		val sourceFiles = sources.map { it.writeIfNeeded(sourcesDir) }.toMutableList()
 
 		pluginClasspaths.forEach { filepath ->
 			if (!filepath.exists()) {
@@ -612,6 +615,17 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 			}
 		}
 
+		if (symbolProcessors.isNotEmpty()) {
+			val kspResult = compileJvmKotlin(sourceFiles)
+			if (kspResult != ExitCode.OK) {
+				return makeResult(kspResult)
+			}
+			removeKsp()
+			val generatedKspSources = listOf(kspKotlinSourceDir, kspJavaSourceDir, kspResourceDir).flatMap {
+				it.listFilesRecursively()
+			}
+			sourceFiles += generatedKspSources
+		}
 		/*
 		There are 4 steps to the compilation process:
 		1. Generate stubs (using kotlinc with kapt plugin which does no further compilation)
