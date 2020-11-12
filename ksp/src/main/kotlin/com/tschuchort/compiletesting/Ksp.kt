@@ -8,11 +8,19 @@ import com.google.devtools.ksp.KspOptions
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.impl.MessageCollectorBasedKSPLogger
+import org.jetbrains.kotlin.analyzer.AnalysisResult
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.com.intellij.mock.MockProject
+import org.jetbrains.kotlin.com.intellij.openapi.project.Project
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.container.ComponentProvider
+import org.jetbrains.kotlin.context.ProjectContext
+import org.jetbrains.kotlin.descriptors.ModuleDescriptor
+import org.jetbrains.kotlin.psi.KtFile
+import org.jetbrains.kotlin.resolve.BindingContext
+import org.jetbrains.kotlin.resolve.BindingTrace
 import org.jetbrains.kotlin.resolve.jvm.extensions.AnalysisHandlerExtension
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import java.io.File
@@ -71,6 +79,20 @@ private val KotlinCompilation.kspClassesDir: File
 /**
  * Custom subclass of [AbstractKotlinSymbolProcessingExtension] where processors are pre-defined instead of being
  * loaded via ServiceLocator.
+ *
+ * Note that this works different from real KSP.
+ *
+ * The KSP plugin does not participate in main Kotlin compilation since v20201106.
+ * Instead, it runs a separate gradle task to run KSP analysis and adds the output of it that task
+ * as an input to the main Kotlin compilation.
+ *
+ * Unfortunately, repeating that behavior is not feasible with the current KSP integration as it
+ * would require to run KotlinCompilation twice.
+ * Instead, we hack it here to revert it back to the previous behavior to run inside the main
+ * compilation by changing the analysis result.
+ * see: https://github.com/tschuchortdev/kotlin-compile-testing/issues/72
+ * see: https://github.com/google/ksp/commit/328706164554f3036dba08333cdac6d52e8d0ab3
+ *
  */
 private class KspTestExtension(
     options: KspOptions,
@@ -81,7 +103,42 @@ private class KspTestExtension(
     logger = logger,
     testMode = false
 ) {
+    var analysisCompleted = false
+
     override fun loadProcessors() = processors
+
+    override fun doAnalysis(
+        project: Project,
+        module: ModuleDescriptor,
+        projectContext: ProjectContext,
+        files: Collection<KtFile>,
+        bindingTrace: BindingTrace,
+        componentProvider: ComponentProvider
+    ): AnalysisResult? {
+        if (analysisCompleted) {
+            return null
+        }
+        return super.doAnalysis(project, module, projectContext, files, bindingTrace, componentProvider)
+    }
+
+    override fun analysisCompleted(
+        project: Project,
+        module: ModuleDescriptor,
+        bindingTrace: BindingTrace,
+        files: Collection<KtFile>
+    ): AnalysisResult? {
+        if (analysisCompleted) {
+            return null
+        }
+        analysisCompleted = true
+        return AnalysisResult.RetryWithAdditionalRoots(
+            BindingContext.EMPTY,
+            module,
+            listOf(options.javaOutputDir),
+            listOf(options.kotlinOutputDir),
+            addToEnvironment = true
+        )
+    }
 }
 
 /**

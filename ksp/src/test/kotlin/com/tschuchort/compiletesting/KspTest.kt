@@ -16,6 +16,43 @@ import org.mockito.Mockito.`when`
 @RunWith(JUnit4::class)
 class KspTest {
     @Test
+    fun javaDependingOnKotlin() {
+        // there might be false negatives when java depends on kotlin because KSP does not run
+        // full compilation. This test is here to ensure we don't report those intermediate
+        // issues.
+        val kotlinSrc = SourceFile.kotlin("KotlinClass.kt", """
+            class KotlinClass {
+            }
+        """.trimIndent())
+        val javaSrc = SourceFile.java("JavaClass.java", """
+            class Foo {
+                public KotlinClass kotlinClass;
+            }
+        """.trimIndent())
+        val instance = mock<SymbolProcessor>()
+        val result = KotlinCompilation().apply {
+            sources = listOf(kotlinSrc, javaSrc)
+            symbolProcessors = listOf(instance)
+        }.compile()
+        assertThat(result.exitCode).isEqualTo(ExitCode.OK)
+    }
+    @Test
+    fun badCodeFailsCompilation() {
+        // This test would fail if we simply run kotlin compilation with KSP plugin as it
+        // prevents further compilation on the code.
+        val src = SourceFile.kotlin("Foo.kt", """
+            class Foo {
+                val x:NonExistingType = TODO()
+            }
+        """.trimIndent())
+        val instance = mock<SymbolProcessor>()
+        val result = KotlinCompilation().apply {
+            sources = listOf(src)
+            symbolProcessors = listOf(instance)
+        }.compile()
+        assertThat(result.exitCode).isEqualTo(ExitCode.COMPILATION_ERROR)
+    }
+    @Test
     fun failedKspTest() {
         val instance = mock<SymbolProcessor>()
         `when`(instance.process(any())).thenThrow(
