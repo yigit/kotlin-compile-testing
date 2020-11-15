@@ -28,40 +28,41 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
     private val _generatedSources = mutableListOf<File>()
     val generatedSources : List<File>
         get() = _generatedSources
-    private val preCompilationSteps = mutableListOf<CompilationStep<AbstractKotlinCompilation<A>>>()
-    private val postCompilationSteps = mutableListOf<CompilationStep<AbstractKotlinCompilation<A>>>()
+    private val compilationSteps = mutableListOf<CompilationStep<AbstractKotlinCompilation<A>>>()
 
-    fun addPreCompilationStep(step : CompilationStep<AbstractKotlinCompilation<A>>) {
-        if (preCompilationSteps.contains(step)) return
-        preCompilationSteps.add(step)
+    fun addCompilationStep(step : CompilationStep<AbstractKotlinCompilation<A>>) {
+        // insert it before the step that has higher order
+        val index = compilationSteps.indexOfFirst {
+            it.order.ordinal > step.order.ordinal
+        }
+        if (index == -1) {
+            compilationSteps.add(step)
+        } else {
+            compilationSteps.add(index, step)
+        }
     }
-    fun addPostCompilationStep(step : CompilationStep<AbstractKotlinCompilation<A>>) {
-        if (postCompilationSteps.contains(step)) return
-        postCompilationSteps.add(step)
-    }
 
-    protected fun runPreCompilationSteps() = runSteps(preCompilationSteps)
-
-    protected fun runPostCompilationSteps() = runSteps(postCompilationSteps)
+    protected fun runCompilationSteps() = runSteps(compilationSteps)
 
     private fun runSteps(steps: List<CompilationStep<AbstractKotlinCompilation<A>>>): Pair<KotlinCompilation.ExitCode, List<File>> {
         // make sure all needed directories exist
         sourcesDir.mkdirs()
         // write given sources to working directory
-        val sourceFiles = sources.map { it.writeIfNeeded(sourcesDir) }
+        val initialSources = sources.map { it.writeIfNeeded(sourcesDir) }
 
         return steps.fold(
-            KotlinCompilation.ExitCode.OK to sourceFiles
+            KotlinCompilation.ExitCode.OK to initialSources
         ) { (exitCode, sources), step ->
             if (exitCode != KotlinCompilation.ExitCode.OK) {
                 exitCode to sources
+            } else {
+                val intermediateResult = step.execute(
+                    compilation = this,
+                    sourceFiles = sources
+                )
+                _generatedSources.addAll(intermediateResult.generatedSources)
+                intermediateResult.exitCode to sources + intermediateResult.generatedSources
             }
-            val intermediateResult = step.execute(
-                compilation = this,
-                sourceFiles = sourceFiles
-            )
-            _generatedSources.addAll(intermediateResult.generatedSources)
-            intermediateResult.exitCode to sources + intermediateResult.generatedSources
         }
     }
 
@@ -109,7 +110,7 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
     }
 
     /** Performs the compilation step to compile Kotlin source files */
-    protected fun compileKotlin(sources: List<File>, compiler: CLICompiler<A>, arguments: A): KotlinCompilation.ExitCode {
+    fun compileKotlin(sources: List<File>, compiler: CLICompiler<A>, arguments: A): KotlinCompilation.ExitCode {
 
         /**
          * Here the list of compiler plugins is set

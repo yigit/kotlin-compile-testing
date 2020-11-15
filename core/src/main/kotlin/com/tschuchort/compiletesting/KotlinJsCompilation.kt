@@ -29,7 +29,7 @@ class KotlinJsCompilation internal constructor(
 
 
   // setup common arguments for the two kotlinc calls
-  private fun jsArgs() = commonArguments(K2JSCompilerArguments()) { args ->
+  fun jsArgs() = commonArguments(K2JSCompilerArguments()) { args ->
     // the compiler should never look for stdlib or reflect in the
     // kotlinHome directory (which is null anyway). We will put them
     // in the classpath manually if they're needed
@@ -53,11 +53,11 @@ class KotlinJsCompilation internal constructor(
   /** Runs the compilation task */
   fun compile(): Result {
     // make sure all needed directories exist
-    sourcesDir.mkdirs()
     outputDir.mkdirs()
 
-    // write given sources to working directory
-    val sourceFiles = sources.map { it.writeIfNeeded(sourcesDir) }
+    addCompilationStep(
+      KotlinJSCompilationStep() as CompilationStep<AbstractKotlinCompilation<K2JSCompilerArguments>>
+    )
 
     pluginClasspaths.forEach { filepath ->
       if (!filepath.exists()) {
@@ -66,17 +66,8 @@ class KotlinJsCompilation internal constructor(
       }
     }
 
-
-    /* Work around for warning that sometimes happens:
-    "Failed to initialize native filesystem for Windows
-    java.lang.RuntimeException: Could not find installation home path.
-    Please make sure bin/idea.properties is present in the installation directory"
-    See: https://github.com/arturbosch/detekt/issues/630
-    */
-    withSystemProperty("idea.use.native.fs.for.win", "false") {
-      // step 1: compile Kotlin files
-      return makeResult(compileKotlin(sourceFiles, K2JSCompiler(), jsArgs()))
-    }
+    val (exitCode, _) = runCompilationSteps()
+    return makeResult(exitCode)
   }
 
   private fun makeResult(exitCode: KotlinCompilation.ExitCode): Result {

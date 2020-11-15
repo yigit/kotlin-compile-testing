@@ -16,24 +16,9 @@
 
 package com.tschuchort.compiletesting
 
-import com.facebook.buck.jvm.java.javax.SynchronizedToolProvider
-import org.jetbrains.kotlin.base.kapt3.AptMode
-import org.jetbrains.kotlin.base.kapt3.KaptFlag
-import org.jetbrains.kotlin.base.kapt3.KaptOptions
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
-import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
-import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
-import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
-import org.jetbrains.kotlin.config.Services
-import org.jetbrains.kotlin.kapt3.base.incremental.DeclaredProcType
-import org.jetbrains.kotlin.kapt3.base.incremental.IncrementalProcessor
-import org.jetbrains.kotlin.kapt3.util.MessageCollectorBackedKaptLogger
 import java.io.*
-import java.lang.RuntimeException
 import java.net.URLClassLoader
-import java.nio.file.Path
-import javax.annotation.processing.Processor
-import javax.tools.*
 
 data class PluginOption(val pluginId: PluginId, val optionName: OptionName, val optionValue: OptionValue)
 
@@ -168,129 +153,6 @@ class KotlinCompilation internal constructor(
         args.suppressMissingBuiltinsError = suppressMissingBuiltinsError
 	}
 
-	/**
-	 * 	Base javac arguments that only depend on the the arguments given by the user
-	 *  Depending on which compiler implementation is actually used, more arguments
-	 *  may be added
-	 */
-	private fun baseJavacArgs(isJavac9OrLater: Boolean) = mutableListOf<String>().apply {
-		if(verbose) {
-			add("-verbose")
-			add("-Xlint:path") // warn about invalid paths in CLI
-			add("-Xlint:options") // warn about invalid options in CLI
-
-			if(isJavac9OrLater)
-				add("-Xlint:module") // warn about issues with the module system
-		}
-
-		addAll("-d", classesDir.absolutePath)
-
-		add("-proc:none") // disable annotation processing
-
-		if(allWarningsAsErrors)
-			add("-Werror")
-
-		addAll(javacArguments)
-
-		// also add class output path to javac classpath so it can discover
-		// already compiled Kotlin classes
-		addAll("-cp", (commonClasspaths() + classesDir)
-			    .joinToString(File.pathSeparator, transform = File::getAbsolutePath))
-	}
-
-	/** Performs the 4th compilation step to compile Java source files */
-	private fun compileJava(sourceFiles: List<File>): ExitCode {
-		val javaSources = sourceFiles
-			    .filterNot<File>(File::hasKotlinFileExtension)
-
-		if(javaSources.isEmpty())
-			return ExitCode.OK
-
-        if(jdkHome != null) {
-            /* If a JDK home is given, try to run javac from there so it uses the same JDK
-               as K2JVMCompiler. Changing the JDK of the system java compiler via the
-               "--system" and "-bootclasspath" options is not so easy. */
-
-            val jdkBinFile = File(jdkHome, "bin")
-            check(jdkBinFile.exists()) { "No JDK bin folder found at: ${jdkBinFile.toPath()}" }
-
-			val javacCommand = jdkBinFile.absolutePath + File.separatorChar + "javac"
-
-			val isJavac9OrLater = isJavac9OrLater(getJavacVersionString(javacCommand))
-			val javacArgs = baseJavacArgs(isJavac9OrLater)
-
-            val javacProc = ProcessBuilder(listOf(javacCommand) + javacArgs + javaSources.map(File::getAbsolutePath))
-					.directory(workingDir)
-					.redirectErrorStream(true)
-					.start()
-
-			javacProc.inputStream.copyTo(model.internalMessageStream)
-			javacProc.errorStream.copyTo(model.internalMessageStream)
-
-            return when(javacProc.waitFor()) {
-                0 -> ExitCode.OK
-                1 -> ExitCode.COMPILATION_ERROR
-                else -> ExitCode.INTERNAL_ERROR
-            }
-        }
-        else {
-            /*  If no JDK is given, we will use the host process' system java compiler
-                and erase the bootclasspath. The user is then on their own to somehow
-                provide the JDK classes via the regular classpath because javac won't
-                work at all without them */
-
-			val isJavac9OrLater = isJdk9OrLater()
-			val javacArgs = baseJavacArgs(isJavac9OrLater).apply {
-				// erase bootclasspath or JDK path because no JDK was specified
-				if (isJavac9OrLater)
-					addAll("--system", "none")
-				else
-					addAll("-bootclasspath", "")
-			}
-
-            log("jdkHome is null. Using system java compiler of the host process.")
-
-            val javac = SynchronizedToolProvider.systemJavaCompiler
-            val javaFileManager = javac.getStandardFileManager(null, null, null)
-            val diagnosticCollector = DiagnosticCollector<JavaFileObject>()
-
-            fun printDiagnostics() = diagnosticCollector.diagnostics.forEach { diag ->
-                when(diag.kind) {
-                    Diagnostic.Kind.ERROR -> error(diag.getMessage(null))
-                    Diagnostic.Kind.WARNING,
-                    Diagnostic.Kind.MANDATORY_WARNING -> warn(diag.getMessage(null))
-                    else -> log(diag.getMessage(null))
-                }
-            }
-
-            try {
-                val noErrors = javac.getTask(
-                    OutputStreamWriter(model.internalMessageStream), javaFileManager,
-                    diagnosticCollector, javacArgs,
-                    /* classes to be annotation processed */ null,
-					javaSources.map { FileJavaFileObject(it) }
-						.filter { it.kind == JavaFileObject.Kind.SOURCE }
-                ).call()
-
-                printDiagnostics()
-
-                return if(noErrors)
-                    ExitCode.OK
-                else
-                    ExitCode.COMPILATION_ERROR
-            }
-            catch (e: Exception) {
-                if(e is RuntimeException || e is IllegalArgumentException) {
-                    printDiagnostics()
-                    error(e.toString())
-                    return ExitCode.INTERNAL_ERROR
-                }
-                else
-                    throw e
-            }
-        }
-	}
-
 	/** Runs the compilation task */
 	fun compile(): Result {
 		// make sure all needed directories exist
@@ -302,24 +164,15 @@ class KotlinCompilation internal constructor(
 				return makeResult(ExitCode.INTERNAL_ERROR)
 			}
 		}
+		addCompilationStep(
+			KotlinJvmCompilationStep() as CompilationStep<AbstractKotlinCompilation<K2JVMCompilerArguments>>
+		)
+		addCompilationStep(
+			JavaCompilationStep() as CompilationStep<AbstractKotlinCompilation<K2JVMCompilerArguments>>
+		)
 
-		val (exitCode, sourceFiles) = runPreCompilationSteps()
-		/*
-		There are 4 steps to the compilation process:
-		1. Generate stubs (using kotlinc with kapt plugin which does no further compilation)
-		2. Run apt (using kotlinc with kapt plugin which does no further compilation)
-		3. Run kotlinc with the normal Kotlin sources and Kotlin sources generated in step 2
-		4. Run javac with Java sources and the compiled Kotlin classes
-		 */
-		// step 3: compile Kotlin files
-		compileKotlin(sourceFiles, K2JVMCompiler(), commonK2JVMArgs()).let { exitCode ->
-			if(exitCode != ExitCode.OK) {
-				return makeResult(exitCode)
-			}
-		}
-
-		// step 4: compile Java files
-		return makeResult(compileJava(sourceFiles))
+		val (exitCode, _) = runCompilationSteps()
+		return makeResult(exitCode)
 	}
 
 	private fun makeResult(exitCode: ExitCode): Result {
@@ -331,7 +184,7 @@ class KotlinCompilation internal constructor(
 		return Result(exitCode, messages)
 	}
 
-	private fun commonClasspaths() = mutableListOf<File>().apply {
+	internal fun commonClasspaths() = mutableListOf<File>().apply {
 		addAll(classpaths)
 		addAll(listOfNotNull(kotlinStdLibJar,  kotlinStdLibCommonJar, kotlinStdLibJdkJar,
             kotlinReflectJar, kotlinScriptRuntimeJar

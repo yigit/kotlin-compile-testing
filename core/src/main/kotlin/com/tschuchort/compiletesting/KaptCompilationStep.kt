@@ -16,7 +16,7 @@ import java.net.URLClassLoader
 
 internal class KaptCompilationStep : CompilationStep<KotlinCompilation> {
     override val order: CompilationStep.Order
-        get() = CompilationStep.Order.PRE_KOTLIN_COMPILE
+        get() = CompilationStep.Order.PRE_KOTLIN_COMPILATION
 
     override fun execute(
         compilation: KotlinCompilation,
@@ -154,6 +154,6 @@ val KotlinCompilation.kapt: KaptModel
     get() = this.getOrPutExtensionData(KaptModel::class) {
             KaptModel(this).also {
                 // TODO fix we shouldn't this cast
-                addPreCompilationStep(KaptCompilationStep() as CompilationStep<AbstractKotlinCompilation<K2JVMCompilerArguments>>)
+                addCompilationStep(KaptCompilationStep() as CompilationStep<AbstractKotlinCompilation<K2JVMCompilerArguments>>)
             }
         }

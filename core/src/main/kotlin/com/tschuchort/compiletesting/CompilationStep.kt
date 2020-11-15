@@ -10,8 +10,9 @@ interface CompilationStep<in Compilation : AbstractKotlinCompilation<*>> {
     ) : IntermediateResult
 
     enum class Order {
-        PRE_KOTLIN_COMPILE,
-        POST_KOTLIN_COMPILE
+        PRE_KOTLIN_COMPILATION,
+        KOTLIN_COMPILATION,
+        POST_KOTLIN_COMPILATION
     }
 
     data class IntermediateResult(
