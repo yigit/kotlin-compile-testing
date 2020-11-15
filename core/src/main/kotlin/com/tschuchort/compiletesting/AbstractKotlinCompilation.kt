@@ -25,6 +25,46 @@ import java.nio.file.Paths
 abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal constructor(
     internal open val model: CompilationModelImpl
 ) : CompilationModel by model {
+    private val _generatedSources = mutableListOf<File>()
+    val generatedSources : List<File>
+        get() = _generatedSources
+    private val preCompilationSteps = mutableListOf<CompilationStep<AbstractKotlinCompilation<A>>>()
+    private val postCompilationSteps = mutableListOf<CompilationStep<AbstractKotlinCompilation<A>>>()
+
+    fun addPreCompilationStep(step : CompilationStep<AbstractKotlinCompilation<A>>) {
+        if (preCompilationSteps.contains(step)) return
+        preCompilationSteps.add(step)
+    }
+    fun addPostCompilationStep(step : CompilationStep<AbstractKotlinCompilation<A>>) {
+        if (postCompilationSteps.contains(step)) return
+        postCompilationSteps.add(step)
+    }
+
+    protected fun runPreCompilationSteps() = runSteps(preCompilationSteps)
+
+    protected fun runPostCompilationSteps() = runSteps(postCompilationSteps)
+
+    private fun runSteps(steps: List<CompilationStep<AbstractKotlinCompilation<A>>>): Pair<KotlinCompilation.ExitCode, List<File>> {
+        // make sure all needed directories exist
+        sourcesDir.mkdirs()
+        // write given sources to working directory
+        val sourceFiles = sources.map { it.writeIfNeeded(sourcesDir) }
+
+        return steps.fold(
+            KotlinCompilation.ExitCode.OK to sourceFiles
+        ) { (exitCode, sources), step ->
+            if (exitCode != KotlinCompilation.ExitCode.OK) {
+                exitCode to sources
+            }
+            val intermediateResult = step.execute(
+                compilation = this,
+                sourceFiles = sourceFiles
+            )
+            _generatedSources.addAll(intermediateResult.generatedSources)
+            intermediateResult.exitCode to sources + intermediateResult.generatedSources
+        }
+    }
+
     protected fun commonArguments(args: A, configuration: (args: A) -> Unit): A {
         args.pluginClasspaths = pluginClasspaths.map(File::getAbsolutePath).toTypedArray()
 

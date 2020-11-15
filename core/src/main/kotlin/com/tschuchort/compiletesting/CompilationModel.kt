@@ -4,8 +4,14 @@ import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import java.io.File
 import java.io.OutputStream
+import kotlin.reflect.KClass
 
 interface CompilationModel {
+    /**
+     * A holder to stash data for compilation steps
+     */
+    val extensionData: Map<KClass<*>, Any>
+
     /** Working directory for the compilation */
     var workingDir: File
 
@@ -83,4 +89,6 @@ interface CompilationModel {
     fun log(s: String)
     fun warn(s: String)
     fun error(s: String)
+    fun <T : Any> getExtensionData(key: KClass<T>): T?
+    fun <T : Any> getOrPutExtensionData(key: KClass<T>, create: () -> T): T
 }

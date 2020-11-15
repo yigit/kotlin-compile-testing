@@ -8,7 +8,7 @@ fun defaultCompilerConfig(): KotlinCompilation {
     return KotlinCompilation( ).apply {
         inheritClassPath = false
         skipRuntimeVersionCheck = true
-        correctErrorTypes = true
+        kapt.correctErrorTypes = true
         verbose = true
         reportOutputFiles = false
         messageOutputStream = System.out

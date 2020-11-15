@@ -59,7 +59,7 @@ class CompilerPluginsTest {
 
         val result = defaultCompilerConfig().apply {
             sources = listOf(jSource)
-            annotationProcessors = listOf(annotationProcessor)
+            kapt.annotationProcessors = listOf(annotationProcessor)
             compilerPlugins = listOf(mockPlugin)
             inheritClassPath = true
         }.compile()
