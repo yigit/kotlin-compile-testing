@@ -24,9 +24,6 @@ import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments
 import org.jetbrains.kotlin.cli.common.messages.MessageRenderer
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
-import org.jetbrains.kotlin.config.JVMAssertionsMode
-import org.jetbrains.kotlin.config.JvmDefaultMode
-import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.config.Services
 import org.jetbrains.kotlin.kapt3.base.incremental.DeclaredProcType
 import org.jetbrains.kotlin.kapt3.base.incremental.IncrementalProcessor
@@ -45,207 +42,10 @@ typealias OptionName = String
 typealias OptionValue = String
 
 @Suppress("MemberVisibilityCanBePrivate")
-class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
-	/** Arbitrary arguments to be passed to kapt */
-	var kaptArgs: MutableMap<OptionName, OptionValue> = mutableMapOf()
-
-	/** Annotation processors to be passed to kapt */
-	var annotationProcessors: List<Processor> = emptyList()
-
-	/** Include Kotlin runtime in to resulting .jar */
-	var includeRuntime: Boolean = false
-
-	/** Make kapt correct error types */
-	var correctErrorTypes: Boolean = true
-
-	/** Name of the generated .kotlin_module file */
-	var moduleName: String? = null
-
-	/** Target version of the generated JVM bytecode */
-	var jvmTarget: String = JvmTarget.DEFAULT.description
-
-	/** Generate metadata for Java 1.8 reflection on method parameters */
-	var javaParameters: Boolean = false
-
-	/** Use the IR backend */
-	var useIR: Boolean = false
-
-	/** Paths where to find Java 9+ modules */
-	var javaModulePath: Path? = null
-
-	/**
-	 * Root modules to resolve in addition to the initial modules,
-	 * or all modules on the module path if <module> is ALL-MODULE-PATH
-	 */
-	var additionalJavaModules: MutableList<File> = mutableListOf()
-
-	/** Don't generate not-null assertions for arguments of platform types */
-	var noCallAssertions: Boolean = false
-
-	/** Don't generate not-null assertion for extension receiver arguments of platform types */
-	var noReceiverAssertions: Boolean = false
-
-	/** Don't generate not-null assertions on parameters of methods accessible from Java */
-	var noParamAssertions: Boolean = false
-
-	/** Generate nullability assertions for non-null Java expressions */
-	var strictJavaNullabilityAssertions: Boolean = false
-
-	/** Disable optimizations */
-	var noOptimize: Boolean = false
-
-	/**
-	 * Normalize constructor calls (disable: don't normalize; enable: normalize),
-	 * default is 'disable' in language version 1.2 and below, 'enable' since language version 1.3
-	 *
-	 * {disable|enable}
-	 */
-	var constructorCallNormalizationMode: String? = null
-
-	/** Assert calls behaviour {always-enable|always-disable|jvm|legacy} */
-	var assertionsMode: String? = JVMAssertionsMode.DEFAULT.description
-
-	/** Path to the .xml build file to compile */
-	var buildFile: File? = null
-
-	/** Compile multifile classes as a hierarchy of parts and facade */
-	var inheritMultifileParts: Boolean = false
-
-	/** Use type table in metadata serialization */
-	var useTypeTable: Boolean = false
-
-	/** Allow Kotlin runtime libraries of incompatible versions in the classpath */
-	var skipRuntimeVersionCheck: Boolean = false
-
-	/** Path to JSON file to dump Java to Kotlin declaration mappings */
-	var declarationsOutputPath: File? = null
-
-	/** Combine modules for source files and binary dependencies into a single module */
-	var singleModule: Boolean = false
-
-	/** Suppress the \"cannot access built-in declaration\" error (useful with -no-stdlib) */
-	var suppressMissingBuiltinsError: Boolean = false
-
-	/** Script resolver environment in key-value pairs (the value could be quoted and escaped) */
-	var scriptResolverEnvironment: MutableMap<String, String> = mutableMapOf()
-
-	/** Java compiler arguments */
-	var javacArguments: MutableList<String> = mutableListOf()
-
-	/** Package prefix for Java files */
-	var javaPackagePrefix: String? = null
-
-	/**
-	 * Specify behavior for Checker Framework compatqual annotations (NullableDecl/NonNullDecl).
-	 * Default value is 'enable'
-	 */
-	var supportCompatqualCheckerFrameworkAnnotations: String? = null
-
-	/** Do not throw NPE on explicit 'equals' call for null receiver of platform boxed primitive type */
-	var noExceptionOnExplicitEqualsForBoxedNull: Boolean = false
-
-	/** Allow to use '@JvmDefault' annotation for JVM default method support.
-	 * {disable|enable|compatibility}
-	 * */
-	var jvmDefault: String = JvmDefaultMode.DEFAULT.description
-
-	/** Generate metadata with strict version semantics (see kdoc on Metadata.extraInt) */
-	var strictMetadataVersionSemantics: Boolean = false
-
-	/**
-	 * Transform '(' and ')' in method names to some other character sequence.
-	 * This mode can BREAK BINARY COMPATIBILITY and is only supposed to be used as a workaround
-	 * of an issue in the ASM bytecode framework. See KT-29475 for more details
-	 */
-	var sanitizeParentheses: Boolean = false
-
-	/** Paths to output directories for friend modules (whose internals should be visible) */
-	var friendPaths: List<File> = emptyList()
-
-	/**
-	 * Path to the JDK to be used
-	 *
-	 * If null, no JDK will be used with kotlinc (option -no-jdk)
-	 * and the system java compiler will be used with empty bootclasspath
-	 * (on JDK8) or --system none (on JDK9+). This can be useful if all
-	 * the JDK classes you need are already on the (inherited) classpath.
-	 * */
-	var jdkHome: File? by default { getJdkHome() }
-
-	/**
-	 * Path to the kotlin-stdlib.jar
-	 * If none is given, it will be searched for in the host
-	 * process' classpaths
-	 */
-	var kotlinStdLibJar: File? by default {
-		findInHostClasspath(hostClasspaths, "kotlin-stdlib.jar",
-			kotlinDependencyRegex("(kotlin-stdlib|kotlin-runtime)"))
-	}
-
-	/**
-	 * Path to the kotlin-stdlib-jdk*.jar
-	 * If none is given, it will be searched for in the host
-	 * process' classpaths
-	 */
-	var kotlinStdLibJdkJar: File? by default {
-		findInHostClasspath(hostClasspaths, "kotlin-stdlib-jdk*.jar",
-			kotlinDependencyRegex("kotlin-stdlib-jdk[0-9]+"))
-	}
-
-	/**
-	 * Path to the kotlin-reflect.jar
-	 * If none is given, it will be searched for in the host
-	 * process' classpaths
-	 */
-	var kotlinReflectJar: File? by default {
-		findInHostClasspath(hostClasspaths, "kotlin-reflect.jar",
-			kotlinDependencyRegex("kotlin-reflect"))
-	}
-
-	/**
-	 * Path to the kotlin-script-runtime.jar
-	 * If none is given, it will be searched for in the host
-	 * process' classpaths
-	 */
-	var kotlinScriptRuntimeJar: File? by default {
-		findInHostClasspath(hostClasspaths, "kotlin-script-runtime.jar",
-			kotlinDependencyRegex("kotlin-script-runtime"))
-	}
-
-	/**
-	 * Path to the tools.jar file needed for kapt when using a JDK 8.
-	 *
-	 * Note: Using a tools.jar file with a JDK 9 or later leads to an
-	 * internal compiler error!
-	 */
-	var toolsJar: File? by default {
-        if (!isJdk9OrLater())
-            jdkHome?.let { findToolsJarFromJdk(it) }
-            ?: findInHostClasspath(hostClasspaths, "tools.jar", Regex("tools.jar"))
-        else
-            null
-	}
-
-	// *.class files, Jars and resources (non-temporary) that are created by the
-	// compilation will land here
-	val classesDir get() = workingDir.resolve("classes")
-
-	// Base directory for kapt stuff
-	private val kaptBaseDir get() = workingDir.resolve("kapt")
-
-	// Java annotation processors that are compile by kapt will put their generated files here
-	val kaptSourceDir get() = kaptBaseDir.resolve("sources")
-
-	// Output directory for Kotlin source files generated by kapt
-	val kaptKotlinGeneratedDir get() = kaptArgs[OPTION_KAPT_KOTLIN_GENERATED]
-			?.let { path ->
-				require(File(path).isDirectory) { "$OPTION_KAPT_KOTLIN_GENERATED must be a directory" }
-				File(path)
-			}
-			?: File(kaptBaseDir, "kotlinGenerated")
-
-	val kaptStubsDir get() = kaptBaseDir.resolve("stubs")
-	val kaptIncrementalDataDir get() = kaptBaseDir.resolve("incrementalData")
+class KotlinCompilation internal constructor(
+	override val model: CompilationModelImpl.JvmCompilationModelImpl
+) : AbstractKotlinCompilation<K2JVMCompilerArguments>(model), JvmCompilationModel by model {
+	constructor() : this(CompilationModelImpl.JvmCompilationModelImpl())
 
 	/** ExitCode of the entire Kotlin compilation process */
 	enum class ExitCode {
@@ -291,7 +91,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 
 	// setup common arguments for the two kotlinc calls
-	private fun commonK2JVMArgs() = commonArguments(K2JVMCompilerArguments()) { args ->
+	internal fun commonK2JVMArgs() = commonArguments(K2JVMCompilerArguments()) { args ->
 		args.destination = classesDir.absolutePath
 		args.classpath = commonClasspaths().joinToString(separator = File.pathSeparator)
 
@@ -391,7 +191,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 		}
 
 		val compilerMessageCollector = PrintingMessageCollector(
-			internalMessageStream, MessageRenderer.GRADLE_STYLE, verbose
+			model.internalMessageStream, MessageRenderer.GRADLE_STYLE, verbose
 		)
 
 		val kaptLogger = MessageCollectorBackedKaptLogger(kaptOptions.build(), compilerMessageCollector)
@@ -525,8 +325,8 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 					.redirectErrorStream(true)
 					.start()
 
-			javacProc.inputStream.copyTo(internalMessageStream)
-			javacProc.errorStream.copyTo(internalMessageStream)
+			javacProc.inputStream.copyTo(model.internalMessageStream)
+			javacProc.errorStream.copyTo(model.internalMessageStream)
 
             return when(javacProc.waitFor()) {
                 0 -> ExitCode.OK
@@ -566,7 +366,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
             try {
                 val noErrors = javac.getTask(
-                    OutputStreamWriter(internalMessageStream), javaFileManager,
+                    OutputStreamWriter(model.internalMessageStream), javaFileManager,
                     diagnosticCollector, javacArgs,
                     /* classes to be annotation processed */ null,
 					javaSources.map { FileJavaFileObject(it) }
@@ -650,7 +450,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 	}
 
 	private fun makeResult(exitCode: ExitCode): Result {
-		val messages = internalMessageBuffer.readUtf8()
+		val messages = model.internalMessageBuffer.readUtf8()
 
 		if(exitCode != ExitCode.OK)
 			searchSystemOutForKnownErrors(messages)

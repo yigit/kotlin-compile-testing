@@ -1,54 +1,15 @@
 package com.tschuchort.compiletesting
 
+import com.facebook.buck.jvm.java.javax.com.tschuchort.compiletesting.JsCompilationModel
 import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
 import org.jetbrains.kotlin.cli.js.K2JSCompiler
 import java.io.*
 
 @Suppress("MemberVisibilityCanBePrivate")
-class KotlinJsCompilation : AbstractKotlinCompilation<K2JSCompilerArguments>() {
-
-  var outputFileName: String = "test.js"
-
-  /**
-   * Generate unpacked KLIB into parent directory of output JS file. In combination with -meta-info
-   * generates both IR and pre-IR versions of library.
-   */
-  var irProduceKlibDir: Boolean = false
-
-  /** Generate packed klib into file specified by -output. Disables pre-IR backend */
-  var irProduceKlibFile: Boolean = false
-
-  /** Generates JS file using IR backend. Also disables pre-IR backend */
-  var irProduceJs: Boolean = false
-
-  /** Perform experimental dead code elimination */
-  var irDce: Boolean = false
-
-  /** Perform a more experimental faster dead code elimination */
-  var irDceDriven: Boolean = false
-
-  /** Print declarations' reachability info to stdout during performing DCE */
-  var irDcePrintReachabilityInfo: Boolean = false
-
-  /** Disables pre-IR backend */
-  var irOnly: Boolean = false
-
-  /** Specify a compilation module name for IR backend */
-  var irModuleName: String? = null
-
-  /**
-   * Path to the kotlin-stdlib-js.jar
-   * If none is given, it will be searched for in the host
-   * process' classpaths
-   */
-  var kotlinStdLibJsJar: File? by default {
-    findInHostClasspath(hostClasspaths, "kotlin-stdlib-js.jar",
-      kotlinDependencyRegex("kotlin-stdlib-js"))
-  }
-
-  // *.class files, Jars and resources (non-temporary) that are created by the
-  // compilation will land here
-  val outputDir get() = workingDir.resolve("output")
+class KotlinJsCompilation internal constructor(
+  override val model: CompilationModelImpl.JsCompilationModelImpl
+) : AbstractKotlinCompilation<K2JSCompilerArguments>(model), JsCompilationModel by model {
+  constructor() : this(CompilationModelImpl.JsCompilationModelImpl())
 
   /** Result of the compilation */
   inner class Result(
@@ -119,7 +80,7 @@ class KotlinJsCompilation : AbstractKotlinCompilation<K2JSCompilerArguments>() {
   }
 
   private fun makeResult(exitCode: KotlinCompilation.ExitCode): Result {
-    val messages = internalMessageBuffer.readUtf8()
+    val messages = model.internalMessageBuffer.readUtf8()
 
     if (exitCode != KotlinCompilation.ExitCode.OK)
       searchSystemOutForKnownErrors(messages)
