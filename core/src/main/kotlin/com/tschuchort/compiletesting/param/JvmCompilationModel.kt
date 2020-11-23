@@ -1,9 +1,9 @@
-package com.tschuchort.compiletesting.params
+package com.tschuchort.compiletesting.param
 
 import java.io.File
 import java.nio.file.Path
 
-interface JvmCompilationParameters : CompilationParameters {
+interface JvmCompilationModel : CompilationModel {
     /** Include Kotlin runtime in to resulting .jar */
     val includeRuntime: Boolean
 
@@ -82,6 +82,7 @@ interface JvmCompilationParameters : CompilationParameters {
     val scriptResolverEnvironment: MutableMap<String, String>
 
     /** Java compiler arguments */
+    // TODO move to javac params
     val javacArguments: MutableList<String>
 
     /** Package prefix for Java files */
@@ -159,8 +160,4 @@ interface JvmCompilationParameters : CompilationParameters {
      * internal compiler error!
      */
     val toolsJar: File?
-
-    // *.class files, Jars and resources (non-temporary) that are created by the
-    // compilation will land here
-    val classesDir get() = workingDir.resolve("classes")
 }

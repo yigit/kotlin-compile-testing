@@ -3,6 +3,7 @@ package com.tschuchort.compiletesting
 import com.nhaarman.mockitokotlin2.*
 import com.tschuchort.compiletesting.KotlinCompilation.ExitCode
 import com.tschuchort.compiletesting.MockitoAdditionalMatchersKotlin.Companion.not
+import com.tschuchort.compiletesting.step.kapt
 import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.kotlin.compiler.plugin.AbstractCliOption
 import org.jetbrains.kotlin.compiler.plugin.CliOption
@@ -286,7 +287,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(source)
-			annotationProcessors = listOf(object : AbstractProcessor() {
+			kapt.annotationProcessors = listOf(object : AbstractProcessor() {
 				override fun process(annotations: MutableSet<out TypeElement>?, roundEnv: RoundEnvironment?): Boolean {
 					return false
 				}
@@ -405,7 +406,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(kSource)
-			annotationProcessors = listOf(javaTestProc)
+			kapt.annotationProcessors = listOf(javaTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -430,7 +431,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(jSource)
-			annotationProcessors = listOf(javaTestProc)
+			kapt.annotationProcessors = listOf(javaTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -456,7 +457,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(kSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -482,7 +483,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(jSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -508,7 +509,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(jSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -538,7 +539,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(jSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -565,7 +566,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(jSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -592,7 +593,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(kSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -619,7 +620,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(kSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -667,7 +668,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(kSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -690,7 +691,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(kSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -713,7 +714,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(kSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -737,7 +738,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(jSource)
-			annotationProcessors = listOf(kotlinTestProc)
+			kapt.annotationProcessors = listOf(kotlinTestProc)
 			inheritClassPath = true
 		}.compile()
 
@@ -800,7 +801,7 @@ class KotlinCompilationTests {
 
 		val result = defaultCompilerConfig().apply {
 			sources = listOf(jSource, kSource)
-			annotationProcessors = emptyList()
+			kapt.annotationProcessors = emptyList()
 			inheritClassPath = true
 		}.compile()
 

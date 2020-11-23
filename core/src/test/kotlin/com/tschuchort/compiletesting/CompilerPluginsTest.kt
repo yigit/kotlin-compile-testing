@@ -3,6 +3,7 @@ package com.tschuchort.compiletesting
 import com.nhaarman.mockitokotlin2.any
 import com.nhaarman.mockitokotlin2.atLeastOnce
 import com.nhaarman.mockitokotlin2.verify
+import com.tschuchort.compiletesting.step.kapt
 import org.assertj.core.api.Assertions
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import org.junit.Assert
@@ -59,7 +60,7 @@ class CompilerPluginsTest {
 
         val result = defaultCompilerConfig().apply {
             sources = listOf(jSource)
-            annotationProcessors = listOf(annotationProcessor)
+            kapt.annotationProcessors = listOf(annotationProcessor)
             compilerPlugins = listOf(mockPlugin)
             inheritClassPath = true
         }.compile()

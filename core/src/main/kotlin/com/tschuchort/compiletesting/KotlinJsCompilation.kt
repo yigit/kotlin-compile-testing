@@ -1,65 +1,65 @@
 package com.tschuchort.compiletesting
 
-import org.jetbrains.kotlin.cli.common.arguments.K2JSCompilerArguments
-import org.jetbrains.kotlin.cli.js.K2JSCompiler
+import com.tschuchort.compiletesting.param.JsCompilationModel
+import com.tschuchort.compiletesting.param.JsCompilationModelImpl
+import com.tschuchort.compiletesting.step.JsCompilationStep
 import java.io.*
 
 @Suppress("MemberVisibilityCanBePrivate")
-class KotlinJsCompilation : AbstractKotlinCompilation<K2JSCompilerArguments>() {
+class KotlinJsCompilation internal constructor(
+   private val model: JsCompilationModelImpl
+): AbstractKotlinCompilation<JsCompilationModel>(model) {
+  constructor(): this(JsCompilationModelImpl())
 
-  var outputFileName: String = "test.js"
+  var outputFileName: String by model::outputFileName
 
   /**
    * Generate unpacked KLIB into parent directory of output JS file. In combination with -meta-info
    * generates both IR and pre-IR versions of library.
    */
-  var irProduceKlibDir: Boolean = false
+  var irProduceKlibDir: Boolean by model::irProduceKlibDir
 
   /** Generate packed klib into file specified by -output. Disables pre-IR backend */
-  var irProduceKlibFile: Boolean = false
+  var irProduceKlibFile: Boolean by model::irProduceKlibFile
 
   /** Generates JS file using IR backend. Also disables pre-IR backend */
-  var irProduceJs: Boolean = false
+  var irProduceJs: Boolean by model::irProduceJs
 
   /** Perform experimental dead code elimination */
-  var irDce: Boolean = false
+  var irDce: Boolean by model::irDce
 
   /** Perform a more experimental faster dead code elimination */
-  var irDceDriven: Boolean = false
+  var irDceDriven: Boolean by model::irDceDriven
 
   /** Print declarations' reachability info to stdout during performing DCE */
-  var irDcePrintReachabilityInfo: Boolean = false
+  var irDcePrintReachabilityInfo: Boolean by model::irDcePrintReachabilityInfo
 
   /** Disables pre-IR backend */
-  var irOnly: Boolean = false
+  var irOnly: Boolean by model::irOnly
 
   /** Specify a compilation module name for IR backend */
-  var irModuleName: String? = null
+  var irModuleName: String? by model::irModuleName
 
   /**
    * Path to the kotlin-stdlib-js.jar
    * If none is given, it will be searched for in the host
    * process' classpaths
    */
-  var kotlinStdLibJsJar: File? by default {
-    findInHostClasspath(hostClasspaths, "kotlin-stdlib-js.jar",
-      kotlinDependencyRegex("kotlin-stdlib-js"))
-  }
+  var kotlinStdLibJsJar: File? by model::kotlinStdLibJsJar
 
   // *.class files, Jars and resources (non-temporary) that are created by the
   // compilation will land here
-  val outputDir get() = workingDir.resolve("output")
+  val outputDir by model::outputDir
 
   /** Result of the compilation */
-  inner class Result(
+  class Result(
     /** The exit code of the compilation */
     val exitCode: KotlinCompilation.ExitCode,
     /** Messages that were printed by the compilation */
-    val messages: String
-  ) {
+    val messages: String,
     /** The directory where only the final output class and resources files will be */
-    val outputDirectory: File get() = outputDir
-
+    val outputDirectory: File
+  ) {
     /**
      * Compiled class and resource files that are the final result of the compilation.
      */
@@ -67,73 +67,34 @@ class KotlinJsCompilation : AbstractKotlinCompilation<K2JSCompilerArguments>() {
   }
 
 
-  // setup common arguments for the two kotlinc calls
-  private fun jsArgs() = commonArguments(K2JSCompilerArguments()) { args ->
-    // the compiler should never look for stdlib or reflect in the
-    // kotlinHome directory (which is null anyway). We will put them
-    // in the classpath manually if they're needed
-    args.noStdlib = true
 
-    args.moduleKind = "commonjs"
-    args.outputFile = File(outputDir, outputFileName).absolutePath
-    args.sourceMapBaseDirs = jsClasspath().joinToString(separator = File.pathSeparator)
-    args.libraries = listOfNotNull(kotlinStdLibJsJar).joinToString(separator = ":")
-
-    args.irProduceKlibDir = irProduceKlibDir
-    args.irProduceKlibFile = irProduceKlibFile
-    args.irProduceJs = irProduceJs
-    args.irDce = irDce
-    args.irDceDriven = irDceDriven
-    args.irDcePrintReachabilityInfo = irDcePrintReachabilityInfo
-    args.irOnly = irOnly
-    args.irModuleName = irModuleName
-  }
 
   /** Runs the compilation task */
   fun compile(): Result {
-    // make sure all needed directories exist
-    sourcesDir.mkdirs()
-    outputDir.mkdirs()
-
-    // write given sources to working directory
-    val sourceFiles = sources.map { it.writeIfNeeded(sourcesDir) }
-
-    pluginClasspaths.forEach { filepath ->
+    model.pluginClasspaths.forEach { filepath ->
       if (!filepath.exists()) {
-        error("Plugin $filepath not found")
+        model.messageStream.error("Plugin $filepath not found")
         return makeResult(KotlinCompilation.ExitCode.INTERNAL_ERROR)
       }
     }
-
-
-    /* Work around for warning that sometimes happens:
-    "Failed to initialize native filesystem for Windows
-    java.lang.RuntimeException: Could not find installation home path.
-    Please make sure bin/idea.properties is present in the installation directory"
-    See: https://github.com/arturbosch/detekt/issues/630
-    */
-    withSystemProperty("idea.use.native.fs.for.win", "false") {
-      // step 1: compile Kotlin files
-      return makeResult(compileKotlin(sourceFiles, K2JSCompiler(), jsArgs()))
+    if (!hasStep(JsCompilationStep.ID)) {
+      registerStep(
+        step = JsCompilationStep()
+      )
     }
+
+    val intermediateResult = runSteps()
+    return makeResult(
+      exitCode = intermediateResult.exitCode
+    )
   }
 
   private fun makeResult(exitCode: KotlinCompilation.ExitCode): Result {
-    val messages = internalMessageBuffer.readUtf8()
+    val messages = model.messageStream.collectLog()
 
     if (exitCode != KotlinCompilation.ExitCode.OK)
       searchSystemOutForKnownErrors(messages)
 
-    return Result(exitCode, messages)
+    return Result(exitCode, messages, model.outputDir)
   }
-
-  private fun jsClasspath() = mutableListOf<File>().apply {
-    addAll(classpaths)
-    addAll(listOfNotNull(kotlinStdLibCommonJar, kotlinStdLibJsJar))
-
-    if (inheritClassPath) {
-      addAll(hostClasspaths)
-      log("Inheriting classpaths:  " + hostClasspaths.joinToString(File.pathSeparator))
-    }
-  }.distinct()
 }

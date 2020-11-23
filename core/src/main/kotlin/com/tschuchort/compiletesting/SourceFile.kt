@@ -58,3 +58,7 @@ abstract class SourceFile {
         }
     }
 }
+
+fun List<SourceFile>.writeIfNeeded(dir: File): List<File> = map {
+    it.writeIfNeeded(dir)
+}

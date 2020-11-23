@@ -1,14 +1,22 @@
-package com.tschuchort.compiletesting.params
+package com.tschuchort.compiletesting.param
 
 import com.tschuchort.compiletesting.PluginOption
 import com.tschuchort.compiletesting.SourceFile
 import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import java.io.File
+import kotlin.reflect.KClass
 
-interface CompilationParameters {
-    /** Working directory for the compilation */
-    val workingDir: File
+interface CompilationModel {
+    fun <T: Any> getExtensionData(key: KClass<T>): T?
+
+    fun <T: Any> putExtensionData(key: KClass<T>, value: T)
+
+    fun <T: Any> getOrPutExtensionData(key: KClass<T>, build : () -> T) : T {
+        return getExtensionData(key) ?: build().also {
+            putExtensionData(key, it)
+        }
+    }
 
     /**
      * Paths to directories or .jar files that contain classes
@@ -33,9 +41,6 @@ interface CompilationParameters {
 
     /** Source files to be compiled */
     val sources: List<SourceFile>
-
-    /** Print verbose logging info */
-    val verbose: Boolean
 
     /** Inherit classpath from calling process */
     val inheritClassPath: Boolean
@@ -64,8 +69,10 @@ interface CompilationParameters {
      * If none is given, it will be searched for in the host
      * process' classpaths
      */
-    val kotlinStdLibCommonJar: File
+    val kotlinStdLibCommonJar: File?
 
-    // Directory for input source files
-    val sourcesDir get() = workingDir.resolve("sources")
+    /** Working directory for the compilation */
+    val workingDir: File
+
+    val verbose: Boolean
 }

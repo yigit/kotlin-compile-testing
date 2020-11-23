@@ -1,14 +1,31 @@
-package com.tschuchort.compiletesting.params
+package com.tschuchort.compiletesting.param
 
+import com.tschuchort.compiletesting.*
 import com.tschuchort.compiletesting.default
+import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
+import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import java.io.File
 import java.nio.file.Files
+import kotlin.reflect.KClass
 
-internal class CompilationParametersImpl : CompilationParameters {
+internal abstract class CompilationModelImpl : CompilationModel {
+    internal val messageStream = MessageStream()
+    internal val environment = CompilationEnvironment(messageStream)
+
+
+    private val extensionData = mutableMapOf<KClass<*>, Any>()
+    override fun <T : Any> getExtensionData(key: KClass<T>): T? {
+        return extensionData[key] as? T
+    }
+
+    override fun <T : Any> putExtensionData(key: KClass<T>, value: T) {
+        extensionData[key] = value
+    }
+
     /** Working directory for the compilation */
     override var workingDir: File by default {
         val path = Files.createTempDirectory("Kotlin-Compilation")
-        log("Created temporary working directory at ${path.toAbsolutePath()}")
+        messageStream.log("Created temporary working directory at ${path.toAbsolutePath()}")
         return@default path.toFile()
     }
 
@@ -38,7 +55,11 @@ internal class CompilationParametersImpl : CompilationParameters {
     override var sources: List<SourceFile> = emptyList()
 
     /** Print verbose logging info */
-    override var verbose: Boolean = true
+    override var verbose: Boolean
+        set(value) {
+            messageStream.verbose = value
+        }
+        get() = messageStream.verbose
 
     /** Inherit classpath from calling process */
     override var inheritClassPath: Boolean = false
@@ -67,7 +88,7 @@ internal class CompilationParametersImpl : CompilationParameters {
      * process' classpaths
      */
     override var kotlinStdLibCommonJar: File? by default {
-        findInHostClasspath(hostClasspaths, "kotlin-stdlib-common.jar",
+        environment.findInHostClasspath("kotlin-stdlib-common.jar",
             kotlinDependencyRegex("kotlin-stdlib-common"))
     }
 }
