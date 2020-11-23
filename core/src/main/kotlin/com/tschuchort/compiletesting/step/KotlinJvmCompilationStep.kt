@@ -17,9 +17,15 @@ class KotlinJvmCompilationStep : CompilationStep<JvmCompilationModel> {
     ): CompilationStep.IntermediateResult<JvmCompilationModel> {
         val baseDir = model.workingDir.resolve("jvmCompilation")
         baseDir.mkdirs()
-        val inputSourcesDir = baseDir.resolve("src")
+        val inputSourcesDir = baseDir.resolve("src").also {
+            it.deleteRecursively()
+            it.mkdirs()
+        }
         val sourceFiles = model.sources.writeIfNeeded(inputSourcesDir)
-        val classesOutDir = baseDir.resolve("classes")
+        val classesOutDir = baseDir.resolve("classes").also {
+            it.deleteRecursively()
+            it.mkdirs()
+        }
         val args = compilationUtils.prepareCommonK2JVMArgs(
             params = model,
             outputParams = KotlinCompilationUtils.OutputParameters(

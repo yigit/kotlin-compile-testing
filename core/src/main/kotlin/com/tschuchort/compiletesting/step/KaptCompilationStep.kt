@@ -47,13 +47,11 @@ class KaptParameters(
     internal val inputSourceDir get() = baseDir.resolve("inputSource")
 
     internal fun mkdirs() {
-        baseDir.mkdirs()
-        sourceDir.mkdirs()
-        kotlinGeneratedDir.mkdirs()
-        stubsDir.mkdirs()
-        incrementalDataDir.mkdirs()
-        classesDir.mkdirs()
-        inputSourceDir.mkdirs()
+        listOf(baseDir, sourceDir, kotlinGeneratedDir,
+        stubsDir, incrementalDataDir, classesDir, inputSourceDir).forEach {
+            it.deleteRecursively()
+            it.mkdirs()
+        }
     }
 }
 
@@ -66,6 +64,7 @@ class KaptCompilationStep : CompilationStep<JvmCompilationModel> {
         model: JvmCompilationModel
     ): CompilationStep.IntermediateResult<JvmCompilationModel> {
         val kaptParams = model.kapt ?: return CompilationStep.IntermediateResult.skip(model)
+        kaptParams.mkdirs()
         val exitCode = stubsAndApt(
             env = env,
             compilationUtils = compilationUtils, // move this to the env?
@@ -74,6 +73,8 @@ class KaptCompilationStep : CompilationStep<JvmCompilationModel> {
         )
         val generatedSourceFiles = kaptParams.sourceDir.listFilesRecursively().map {
             SourceFile.fromPath(it)
+        } + kaptParams.kotlinGeneratedDir.listFilesRecursively().map {
+            SourceFile.fromPath(it)
         }
         return CompilationStep.IntermediateResult(
             exitCode = exitCode,
@@ -81,7 +82,8 @@ class KaptCompilationStep : CompilationStep<JvmCompilationModel> {
                 delegate = model,
                 generatedSources = generatedSourceFiles
             ),
-            outputFolders = listOf(kaptParams.classesDir, kaptParams.kotlinGeneratedDir, kaptParams.stubsDir)
+            outputFolders = listOf(kaptParams.classesDir, kaptParams.kotlinGeneratedDir, kaptParams.stubsDir,
+            kaptParams.sourceDir)
         )
     }
 
@@ -97,7 +99,6 @@ class KaptCompilationStep : CompilationStep<JvmCompilationModel> {
             env.messageStream.log("No services were given. Not running kapt steps.")
             return KotlinCompilation.ExitCode.OK
         }
-        kaptParams.mkdirs()
         val kaptOptions = KaptOptions.Builder().also {
             it.stubsOutputDir = kaptParams.stubsDir
             it.sourcesOutputDir = kaptParams.sourceDir

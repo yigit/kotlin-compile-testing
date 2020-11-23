@@ -14,6 +14,13 @@ private class JavacParams(
     val baseDir get() = compilationParams.workingDir.resolve("javac")
     val sourceDir get() = baseDir.resolve("src")
     val classesDir get() = baseDir.resolve("classes")
+    fun mkdirs() {
+        listOf(baseDir, sourceDir, classesDir).forEach {
+            // TODO create a helper function for this.
+            it.deleteRecursively()
+            it.mkdirs()
+        }
+    }
 }
 
 class JavacCompilationStep : CompilationStep<JvmCompilationModel> {
@@ -26,6 +33,7 @@ class JavacCompilationStep : CompilationStep<JvmCompilationModel> {
         model: JvmCompilationModel
     ): CompilationStep.IntermediateResult<JvmCompilationModel> {
         val javacParams = JavacParams(model)
+        javacParams.mkdirs()
         val exitCode = compileJava(
             env = env,
             params = model,

@@ -36,7 +36,7 @@ class StepRegistry<Params : CompilationModel> {
         // first move all shouldRunAfter to become dependencies
         toBeRun.forEach { (_, entry) ->
             entry.shouldRunBefore.forEach {
-                toBeRun[it]?.shouldRunAfter?.add(it)
+                toBeRun[it]?.shouldRunAfter?.add(entry.step.id)
             }
         }
 
@@ -53,6 +53,7 @@ class StepRegistry<Params : CompilationModel> {
             if (chosen == null) {
                 throw IllegalStateException("circular dependency detected")
             }
+            toBeRun.remove(chosen.step.id)
             val intermediate = chosen.step.execute(
                 env = env,
                 compilationUtils = compilationUtils,
