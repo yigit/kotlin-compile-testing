@@ -12,6 +12,8 @@ interface HasExtensionData {
             putExtensionData(key, it)
         }
     }
+
+    fun copyExtensionDataInto(target: HasExtensionData)
 }
 
 internal class HasExtensionDataImpl : HasExtensionData {
@@ -22,5 +24,12 @@ internal class HasExtensionDataImpl : HasExtensionData {
 
     override fun <T : Any> putExtensionData(key: KClass<T>, value: T) {
         extensionData[key] = value
+    }
+
+    override fun copyExtensionDataInto(target: HasExtensionData) {
+        extensionData.forEach {
+            @Suppress("UNCHECKED_CAST")
+            target.putExtensionData(it.key as KClass<Any>, it.value)
+        }
     }
 }

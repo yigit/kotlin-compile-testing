@@ -1,8 +1,7 @@
 package com.tschuchort.compiletesting.step
 
-import com.tschuchort.compiletesting.HostEnvironment
-import com.tschuchort.compiletesting.KotlinCompilation
-import com.tschuchort.compiletesting.KotlinCompilationUtils
+import com.tschuchort.compiletesting.*
+import com.tschuchort.compiletesting.HasExtensionDataImpl
 import com.tschuchort.compiletesting.param.CompilationModel
 import java.io.File
 
@@ -35,7 +34,7 @@ interface CompilationStep<Model: CompilationModel> {
     class ResultPayload(
         val generatedSourceDirs: List<File>,
         val outputDirs: List<File>
-    ) {
+    ) : HasExtensionData by HasExtensionDataImpl() {
         companion object {
             val EMPTY = ResultPayload(
                 generatedSourceDirs = emptyList(),

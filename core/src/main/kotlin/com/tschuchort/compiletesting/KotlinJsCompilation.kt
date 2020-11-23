@@ -56,8 +56,9 @@ class KotlinJsCompilation internal constructor(
     /** Messages that were printed by the compilation */
     val messages: String,
     /** The directory where only the final output class and resources files will be */
-    val outputDirectory: File
-  ) {
+    val outputDirectory: File,
+    val extraData: HasExtensionData
+  ) : HasExtensionData by extraData {
     /**
      * Compiled class and resource files that are the final result of the compilation.
      */
@@ -104,7 +105,8 @@ class KotlinJsCompilation internal constructor(
     return Result(
       exitCode = KotlinCompilation.ExitCode.INTERNAL_ERROR,
       messages = messages,
-      outputDirectory = errorOutputDir
+      outputDirectory = errorOutputDir,
+      extraData = HasExtensionDataImpl()
     )
   }
 
@@ -120,6 +122,7 @@ class KotlinJsCompilation internal constructor(
       it.deleteRecursively()
       it.mkdirs()
     }
+
     executionResult.resultPayloads.forEach {
       it.outputDirs.forEach {
         it.copyRecursively(outputDirectory)
@@ -128,7 +131,8 @@ class KotlinJsCompilation internal constructor(
     return Result(
       exitCode = executionResult.exitCode,
       messages = messages,
-      outputDirectory = outputDirectory)
+      outputDirectory = outputDirectory,
+      extraData = executionResult)
   }
 
   private class SingleCompilationModel(

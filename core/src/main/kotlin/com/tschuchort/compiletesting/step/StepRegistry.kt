@@ -1,8 +1,7 @@
 package com.tschuchort.compiletesting.step
 
-import com.tschuchort.compiletesting.HostEnvironment
-import com.tschuchort.compiletesting.KotlinCompilation
-import com.tschuchort.compiletesting.KotlinCompilationUtils
+import com.tschuchort.compiletesting.*
+import com.tschuchort.compiletesting.HasExtensionDataImpl
 import com.tschuchort.compiletesting.param.CompilationModel
 
 class StepRegistry<Params : CompilationModel> {
@@ -42,6 +41,7 @@ class StepRegistry<Params : CompilationModel> {
         var model = params
         var exitCode = KotlinCompilation.ExitCode.OK
         val resultPayloads = mutableListOf<CompilationStep.ResultPayload>()
+
         while(toBeRun.isNotEmpty()) {
             // find a step w/o any dependencies, execute
             val chosen = toBeRun.values.firstOrNull { step ->
@@ -68,7 +68,11 @@ class StepRegistry<Params : CompilationModel> {
         return ExecutionResult(
             exitCode = exitCode,
             resultPayloads = resultPayloads
-        )
+        ).also {
+            resultPayloads.forEach { payload ->
+                payload.copyExtensionDataInto(it)
+            }
+        }
     }
 
     fun hasStep(id: String): Boolean = steps.containsKey(id)
@@ -82,5 +86,5 @@ class StepRegistry<Params : CompilationModel> {
     internal class ExecutionResult(
         val exitCode: KotlinCompilation.ExitCode,
         val resultPayloads:List<CompilationStep.ResultPayload>
-    )
+    ): HasExtensionData by HasExtensionDataImpl()
 }
