@@ -16,6 +16,45 @@ import org.mockito.Mockito.`when`
 @RunWith(JUnit4::class)
 class KspTest {
     @Test
+    fun javaDependingOnKotlin() {
+        // there might be false negatives when java depends on kotlin because KSP does not run
+        // full compilation. This test is here to ensure we don't report those intermediate
+        // issues.
+        val kotlinSrc = SourceFile.kotlin("KotlinClass.kt", """
+            class KotlinClass {
+            }
+        """.trimIndent())
+        val javaSrc = SourceFile.java("JavaClass.java", """
+            class Foo {
+                public KotlinClass kotlinClass;
+            }
+        """.trimIndent())
+        val instance = mock<SymbolProcessor>()
+        val result = KotlinCompilation().apply {
+            sources = listOf(kotlinSrc, javaSrc)
+            ksp.symbolProcessors = listOf(instance)
+        }.compile()
+        assertThat(result.exitCode).isEqualTo(ExitCode.OK)
+    }
+
+    @Test
+    fun badCodeFailsCompilation() {
+        // This test would fail if we simply run kotlin compilation with KSP plugin as it
+        // prevents further compilation on the code.
+        val src = SourceFile.kotlin("Foo.kt", """
+            class Foo {
+                val x:NonExistingType = TODO()
+            }
+        """.trimIndent())
+        val instance = mock<SymbolProcessor>()
+        val result = KotlinCompilation().apply {
+            sources = listOf(src)
+            ksp.symbolProcessors = listOf(instance)
+        }.compile()
+        assertThat(result.exitCode).isEqualTo(ExitCode.COMPILATION_ERROR)
+    }
+
+    @Test
     fun failedKspTest() {
         val instance = mock<SymbolProcessor>()
         `when`(instance.process(any())).thenThrow(
@@ -23,7 +62,7 @@ class KspTest {
         )
         val result = KotlinCompilation().apply {
             sources = listOf(DUMMY_KOTLIN_SRC)
-            symbolProcessors = listOf(instance)
+            ksp.symbolProcessors = listOf(instance)
         }.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.INTERNAL_ERROR)
         assertThat(result.messages).contains("intentional fail")
@@ -34,7 +73,7 @@ class KspTest {
         val instance = mock<SymbolProcessor>()
         val result = KotlinCompilation().apply {
             sources = listOf(DUMMY_KOTLIN_SRC)
-            symbolProcessors = listOf(instance)
+            ksp.symbolProcessors = listOf(instance)
         }.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.OK)
         instance.inOrder {
@@ -87,7 +126,7 @@ class KspTest {
         }
         val result = KotlinCompilation().apply {
             sources = listOf(annotation, targetClass)
-            symbolProcessors = listOf(processor)
+            ksp.symbolProcessors = listOf(processor)
         }.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.OK)
     }
@@ -106,10 +145,10 @@ class KspTest {
         )
         val result = KotlinCompilation().apply {
             sources = listOf(source)
-            symbolProcessors = listOf(
+            ksp.symbolProcessors = listOf(
                 ClassGeneratingProcessor("generated", "A"),
                 ClassGeneratingProcessor("generated", "B"))
-            symbolProcessors = symbolProcessors + ClassGeneratingProcessor("generated", "C")
+            ksp.symbolProcessors = ksp.symbolProcessors + ClassGeneratingProcessor("generated", "C")
         }.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.OK)
     }
@@ -119,12 +158,12 @@ class KspTest {
         val instance1 = mock<SymbolProcessor>()
         val instance2 = mock<SymbolProcessor>()
         KotlinCompilation().apply {
-            symbolProcessors = listOf(instance1)
-            assertThat(symbolProcessors).containsExactly(instance1)
-            symbolProcessors = listOf(instance2)
-            assertThat(symbolProcessors).containsExactly(instance2)
-            symbolProcessors = symbolProcessors + instance1
-            assertThat(symbolProcessors).containsExactly(instance2, instance1)
+            ksp.symbolProcessors = listOf(instance1)
+            assertThat(ksp.symbolProcessors).containsExactly(instance1)
+            ksp.symbolProcessors = listOf(instance2)
+            assertThat(ksp.symbolProcessors).containsExactly(instance2)
+            ksp.symbolProcessors = ksp.symbolProcessors + instance1
+            assertThat(ksp.symbolProcessors).containsExactly(instance2, instance1)
         }
     }
 
@@ -132,15 +171,13 @@ class KspTest {
     fun outputDirectoryContents() {
         val compilation = KotlinCompilation().apply {
             sources = listOf(DUMMY_KOTLIN_SRC)
-            symbolProcessors = listOf(ClassGeneratingProcessor("generated", "Gen"))
+            ksp.symbolProcessors = listOf(ClassGeneratingProcessor("generated", "Gen"))
         }
         val result = compilation.compile()
         assertThat(result.exitCode).isEqualTo(ExitCode.OK)
-        val generatedSources = compilation.kspSourcesDir.walkTopDown().filter {
-            it.isFile
-        }.toList()
-        assertThat(generatedSources).containsExactly(
-            compilation.kspSourcesDir.resolve("kotlin/generated/Gen.kt")
+        val generatedSources = result.sourcesGeneratedByAnnotationProcessor
+        assertThat(generatedSources.map { it.name }).containsExactly(
+            "Gen.kt"
         )
     }
 

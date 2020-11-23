@@ -29,7 +29,7 @@ internal fun getJdkHome()
 internal fun isJdk9OrLater(): Boolean
         = SourceVersion.latestSupported().compareTo(SourceVersion.RELEASE_8) > 0
 
-internal fun File.listFilesRecursively(): List<File> {
+fun File.listFilesRecursively(): List<File> {
     val files = listFiles() ?: return emptyList()
     return files.flatMap { file ->
         if(file.isDirectory)
