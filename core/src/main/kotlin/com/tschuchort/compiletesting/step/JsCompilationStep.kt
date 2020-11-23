@@ -9,7 +9,7 @@ class JsCompilationStep : CompilationStep<JsCompilationModel> {
         get() = ID
 
     override fun execute(
-        env: CompilationEnvironment,
+        env: HostEnvironment,
         compilationUtils: KotlinCompilationUtils,
         model: JsCompilationModel
     ): CompilationStep.IntermediateResult<JsCompilationModel> {
@@ -17,7 +17,10 @@ class JsCompilationStep : CompilationStep<JsCompilationModel> {
         val sourcesDir = model.workingDir.resolve("sources").also {
             it.mkdirs()
         }
-        model.outputDir.mkdirs()
+        val outputDir = model.workingDir.resolve("js-compilation-output").also {
+            it.deleteRecursively()
+            it.mkdirs()
+        }
 
         // write given sources to working directory
         val sourceFiles = model.sources.writeIfNeeded(sourcesDir)
@@ -27,13 +30,18 @@ class JsCompilationStep : CompilationStep<JsCompilationModel> {
             params = model,
             sources = sourceFiles,
             compiler = K2JSCompiler(),
-            arguments = compilationUtils.prepareCommonJsArgs(model)
+            arguments = compilationUtils.prepareCommonJsArgs(model, KotlinCompilationUtils.JsOutputParams(
+                outFile = outputDir.resolve(model.outputFileName)
+            ))
         )
 
         return CompilationStep.IntermediateResult(
             exitCode = exitCode,
             updatedModel = model,
-            outputFolders = emptyList()
+            resultPayload = CompilationStep.ResultPayload(
+                generatedSourceDirs = emptyList(),
+                outputDirs = listOf(outputDir)
+            )
         )
     }
 

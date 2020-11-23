@@ -138,13 +138,13 @@ internal class JvmCompilationModelImpl : CompilationModelImpl(), JvmCompilationM
      * process' classpaths
      */
     override var kotlinStdLibJar: File? by default {
-        environment.findInHostClasspath( "kotlin-stdlib.jar",
+        hostEnvironment.findInHostClasspath( "kotlin-stdlib.jar",
             kotlinDependencyRegex("(kotlin-stdlib|kotlin-runtime)")
         )
     }
 
     override var kotlinStdLibJdkJar: File? by default {
-        environment.findInHostClasspath( "kotlin-stdlib-jdk*.jar",
+        hostEnvironment.findInHostClasspath( "kotlin-stdlib-jdk*.jar",
             kotlinDependencyRegex("kotlin-stdlib-jdk[0-9]+")
         )
     }
@@ -155,7 +155,7 @@ internal class JvmCompilationModelImpl : CompilationModelImpl(), JvmCompilationM
      * process' classpaths
      */
     override var kotlinReflectJar: File? by default {
-        environment.findInHostClasspath("kotlin-reflect.jar",
+        hostEnvironment.findInHostClasspath("kotlin-reflect.jar",
             kotlinDependencyRegex("kotlin-reflect")
         )
     }
@@ -166,7 +166,7 @@ internal class JvmCompilationModelImpl : CompilationModelImpl(), JvmCompilationM
      * process' classpaths
      */
     override var kotlinScriptRuntimeJar: File? by default {
-        environment.findInHostClasspath("kotlin-script-runtime.jar",
+        hostEnvironment.findInHostClasspath("kotlin-script-runtime.jar",
             kotlinDependencyRegex("kotlin-script-runtime")
         )
     }
@@ -180,7 +180,7 @@ internal class JvmCompilationModelImpl : CompilationModelImpl(), JvmCompilationM
     override var toolsJar: File? by default {
         if (!isJdk9OrLater())
             jdkHome?.let { findToolsJarFromJdk(it) }
-                ?: environment.findInHostClasspath("tools.jar", Regex("tools.jar"))
+                ?: hostEnvironment.findInHostClasspath("tools.jar", Regex("tools.jar"))
         else
             null
     }

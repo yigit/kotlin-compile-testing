@@ -7,7 +7,7 @@ import java.io.File
 import java.net.URI
 import java.nio.file.Paths
 
-class CompilationEnvironment(
+class HostEnvironment(
     val messageStream: MessageStream
 ) {
     val hostClasspaths by lazy { findHostClasspaths() }

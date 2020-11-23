@@ -3,7 +3,9 @@ package com.tschuchort.compiletesting
 import com.tschuchort.compiletesting.param.JsCompilationModel
 import com.tschuchort.compiletesting.param.JsCompilationModelImpl
 import com.tschuchort.compiletesting.step.JsCompilationStep
+import com.tschuchort.compiletesting.step.StepRegistry
 import java.io.*
+import java.util.*
 
 @Suppress("MemberVisibilityCanBePrivate")
 class KotlinJsCompilation internal constructor(
@@ -47,10 +49,6 @@ class KotlinJsCompilation internal constructor(
    */
   var kotlinStdLibJsJar: File? by model::kotlinStdLibJsJar
 
-  // *.class files, Jars and resources (non-temporary) that are created by the
-  // compilation will land here
-  val outputDir by model::outputDir
-
   /** Result of the compilation */
   class Result(
     /** The exit code of the compilation */
@@ -71,10 +69,11 @@ class KotlinJsCompilation internal constructor(
 
   /** Runs the compilation task */
   fun compile(): Result {
+    val compilationModel = SingleCompilationModel(model)
     model.pluginClasspaths.forEach { filepath ->
       if (!filepath.exists()) {
         model.messageStream.error("Plugin $filepath not found")
-        return makeResult(KotlinCompilation.ExitCode.INTERNAL_ERROR)
+        return makeInternalErrorResult(compilationModel)
       }
     }
     if (!hasStep(JsCompilationStep.ID)) {
@@ -83,18 +82,60 @@ class KotlinJsCompilation internal constructor(
       )
     }
 
-    val intermediateResult = runSteps()
+
+    val intermediateResult = runSteps(compilationModel)
     return makeResult(
-      exitCode = intermediateResult.exitCode
+      compilationModel,
+      intermediateResult
     )
   }
 
-  private fun makeResult(exitCode: KotlinCompilation.ExitCode): Result {
+  private fun makeInternalErrorResult(
+    compilationModel: SingleCompilationModel
+  ): Result {
     val messages = model.messageStream.collectLog()
 
-    if (exitCode != KotlinCompilation.ExitCode.OK)
-      searchSystemOutForKnownErrors(messages)
+    searchSystemOutForKnownErrors(messages)
+    val errorOutputDir = compilationModel.workingDir.resolve("final-output").also {
+      it.deleteRecursively()
+      it.mkdirs()
+    }
+    // figure out how to collect output directories
+    return Result(
+      exitCode = KotlinCompilation.ExitCode.INTERNAL_ERROR,
+      messages = messages,
+      outputDirectory = errorOutputDir
+    )
+  }
 
-    return Result(exitCode, messages, model.outputDir)
+  private fun makeResult(
+    compilationModel: SingleCompilationModel,
+    executionResult: StepRegistry.ExecutionResult
+  ): Result {
+    val messages = model.messageStream.collectLog()
+
+    if (executionResult.exitCode != KotlinCompilation.ExitCode.OK)
+      searchSystemOutForKnownErrors(messages)
+    val outputDirectory = compilationModel.workingDir.resolve("final-output").also {
+      it.deleteRecursively()
+      it.mkdirs()
+    }
+    executionResult.resultPayloads.forEach {
+      it.outputDirs.forEach {
+        it.copyRecursively(outputDirectory)
+      }
+    }
+    return Result(
+      exitCode = executionResult.exitCode,
+      messages = messages,
+      outputDirectory = outputDirectory)
+  }
+
+  private class SingleCompilationModel(
+    val delegate: JsCompilationModel
+  ) : JsCompilationModel by delegate {
+    private val individualWorkingDir = delegate.workingDir.resolve(UUID.randomUUID().toString().take(6))
+    override val workingDir: File
+      get() = individualWorkingDir
   }
 }

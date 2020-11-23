@@ -1,8 +1,7 @@
-package com.facebook.buck.jvm.java.javax.com.tschuchort.compiletesting.step
+package com.tschuchort.compiletesting.step
 
 import com.tschuchort.compiletesting.*
 import com.tschuchort.compiletesting.param.JvmCompilationModel
-import com.tschuchort.compiletesting.step.CompilationStep
 import org.jetbrains.kotlin.cli.jvm.K2JVMCompiler
 import java.io.File
 
@@ -11,7 +10,7 @@ class KotlinJvmCompilationStep : CompilationStep<JvmCompilationModel> {
         get() = ID
 
     override fun execute(
-        env: CompilationEnvironment,
+        env: HostEnvironment,
         compilationUtils: KotlinCompilationUtils,
         model: JvmCompilationModel
     ): CompilationStep.IntermediateResult<JvmCompilationModel> {
@@ -28,7 +27,7 @@ class KotlinJvmCompilationStep : CompilationStep<JvmCompilationModel> {
         }
         val args = compilationUtils.prepareCommonK2JVMArgs(
             params = model,
-            outputParams = KotlinCompilationUtils.OutputParameters(
+            outputParams = KotlinCompilationUtils.JvmOutputParams(
                 classesDir = classesOutDir
             )
         )
@@ -45,7 +44,10 @@ class KotlinJvmCompilationStep : CompilationStep<JvmCompilationModel> {
                 delegate = model,
                 kotlinCompilationClassesDir = classesOutDir
             ),
-            outputFolders = listOf(classesOutDir)
+            resultPayload = CompilationStep.ResultPayload(
+                generatedSourceDirs = emptyList(),
+                outputDirs = listOf(classesOutDir)
+            )
         )
     }
 

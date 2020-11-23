@@ -14,7 +14,7 @@ import java.io.File
 
 class KotlinCompilationUtils(
     val messageStream: MessageStream,
-    val env: CompilationEnvironment
+    val env: HostEnvironment
 ) {
     fun <A : CommonCompilerArguments> prepareCommonArguments(
         params: CompilationModel,
@@ -65,7 +65,7 @@ class KotlinCompilationUtils(
     // setup common arguments for the two kotlinc calls
     fun prepareCommonK2JVMArgs(
         params: JvmCompilationModel,
-        outputParams: OutputParameters
+        outputParams: JvmOutputParams
     ) = prepareCommonArguments(params, K2JVMCompilerArguments()) { args ->
         args.destination = outputParams.classesDir.absolutePath
         args.classpath = commonClasspaths(params).joinToString(separator = File.pathSeparator)
@@ -156,7 +156,7 @@ class KotlinCompilationUtils(
 
     /** Performs the compilation step to compile Kotlin source files */
     fun <Args : CommonCompilerArguments> compileKotlin(
-        env:CompilationEnvironment,
+        env:HostEnvironment,
         params: CompilationModel,
         sources: List<File>,
         compiler: CLICompiler<Args>,
@@ -196,7 +196,8 @@ class KotlinCompilationUtils(
 
     // setup common arguments for the two kotlinc calls
     fun prepareCommonJsArgs(
-        model: JsCompilationModel
+        model: JsCompilationModel,
+        outputParams: JsOutputParams
     ) = prepareCommonArguments(
         params = model,
         args = K2JSCompilerArguments()) { args ->
@@ -206,7 +207,7 @@ class KotlinCompilationUtils(
         args.noStdlib = true
 
         args.moduleKind = "commonjs"
-        args.outputFile = File(model.outputDir, model.outputFileName).absolutePath
+        args.outputFile = outputParams.outFile.absolutePath
         args.sourceMapBaseDirs = jsClasspath(model).joinToString(separator = File.pathSeparator)
         args.libraries = listOfNotNull(model.kotlinStdLibJsJar).joinToString(separator = ":")
 
@@ -230,7 +231,11 @@ class KotlinCompilationUtils(
         }
     }.distinct()
 
-    class OutputParameters(
+    class JvmOutputParams(
         val classesDir: File
+    )
+
+    class JsOutputParams(
+        val outFile: File
     )
 }

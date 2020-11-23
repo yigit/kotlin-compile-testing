@@ -28,7 +28,7 @@ class JavacCompilationStep : CompilationStep<JvmCompilationModel> {
         get() = ID
 
     override fun execute(
-        env: CompilationEnvironment,
+        env: HostEnvironment,
         compilationUtils: KotlinCompilationUtils,
         model: JvmCompilationModel
     ): CompilationStep.IntermediateResult<JvmCompilationModel> {
@@ -46,13 +46,16 @@ class JavacCompilationStep : CompilationStep<JvmCompilationModel> {
                 delegate = model,
                 javacClassesDir = javacParams.classesDir
             ),
-            outputFolders = listOf(javacParams.classesDir)
+            resultPayload = CompilationStep.ResultPayload(
+                generatedSourceDirs = emptyList(),
+                outputDirs = listOf(javacParams.classesDir)
+            )
         )
     }
 
     /** Performs the 4th compilation step to compile Java source files */
     private fun compileJava(
-        env: CompilationEnvironment,
+        env: HostEnvironment,
         params: JvmCompilationModel,
         compilationUtils: KotlinCompilationUtils,
         javacParams: JavacParams

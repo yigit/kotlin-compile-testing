@@ -1,10 +1,9 @@
 package com.tschuchort.compiletesting.step
 
-import com.tschuchort.compiletesting.CompilationEnvironment
+import com.tschuchort.compiletesting.HostEnvironment
 import com.tschuchort.compiletesting.KotlinCompilation
 import com.tschuchort.compiletesting.KotlinCompilationUtils
 import com.tschuchort.compiletesting.param.CompilationModel
-import java.io.File
 
 class StepRegistry<Params : CompilationModel> {
     private val steps = LinkedHashMap<String, Entry<Params>>()
@@ -28,7 +27,7 @@ class StepRegistry<Params : CompilationModel> {
     }
 
     internal fun execute(
-        env: CompilationEnvironment,
+        env: HostEnvironment,
         compilationUtils: KotlinCompilationUtils,
         params: Params
     ): ExecutionResult {
@@ -42,7 +41,7 @@ class StepRegistry<Params : CompilationModel> {
 
         var model = params
         var exitCode = KotlinCompilation.ExitCode.OK
-        val outputFolders = mutableSetOf<File>()
+        val resultPayloads = mutableListOf<CompilationStep.ResultPayload>()
         while(toBeRun.isNotEmpty()) {
             // find a step w/o any dependencies, execute
             val chosen = toBeRun.values.firstOrNull { step ->
@@ -61,14 +60,14 @@ class StepRegistry<Params : CompilationModel> {
             )
             exitCode = intermediate.exitCode
             model = intermediate.updatedModel
-            outputFolders.addAll(intermediate.outputFolders)
+            resultPayloads.add(intermediate.resultPayload)
             if (intermediate.exitCode != KotlinCompilation.ExitCode.OK) {
                 break
             }
         }
         return ExecutionResult(
             exitCode = exitCode,
-            outputFolders = outputFolders.toList()
+            resultPayloads = resultPayloads
         )
     }
 
@@ -82,6 +81,6 @@ class StepRegistry<Params : CompilationModel> {
 
     internal class ExecutionResult(
         val exitCode: KotlinCompilation.ExitCode,
-        val outputFolders:List<File>
+        val resultPayloads:List<CompilationStep.ResultPayload>
     )
 }

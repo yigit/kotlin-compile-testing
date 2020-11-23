@@ -1,6 +1,5 @@
 package com.tschuchort.compiletesting.step
 
-import com.facebook.buck.jvm.java.javax.com.tschuchort.compiletesting.step.KotlinJvmCompilationStep
 import com.tschuchort.compiletesting.*
 import com.tschuchort.compiletesting.param.JvmCompilationModel
 import org.jetbrains.kotlin.base.kapt3.AptMode
@@ -59,7 +58,7 @@ class KaptCompilationStep : CompilationStep<JvmCompilationModel> {
     override val id: String
         get() = ID
     override fun execute(
-        env: CompilationEnvironment,
+        env: HostEnvironment,
         compilationUtils: KotlinCompilationUtils,
         model: JvmCompilationModel
     ): CompilationStep.IntermediateResult<JvmCompilationModel> {
@@ -82,14 +81,16 @@ class KaptCompilationStep : CompilationStep<JvmCompilationModel> {
                 delegate = model,
                 generatedSources = generatedSourceFiles
             ),
-            outputFolders = listOf(kaptParams.classesDir, kaptParams.kotlinGeneratedDir, kaptParams.stubsDir,
-            kaptParams.sourceDir)
+            resultPayload = CompilationStep.ResultPayload(
+                generatedSourceDirs = listOf(kaptParams.sourceDir, kaptParams.kotlinGeneratedDir),
+                outputDirs = listOf(kaptParams.classesDir)
+            )
         )
     }
 
     /** Performs the 1st and 2nd compilation step to generate stubs and run annotation processors */
     private fun stubsAndApt(
-        env: CompilationEnvironment,
+        env: HostEnvironment,
         compilationUtils: KotlinCompilationUtils,
         params: JvmCompilationModel,
         kaptParams: KaptParameters
@@ -177,7 +178,7 @@ class KaptCompilationStep : CompilationStep<JvmCompilationModel> {
 
         val k2JvmArgs = compilationUtils.prepareCommonK2JVMArgs(
             params = params,
-            outputParams = KotlinCompilationUtils.OutputParameters(kaptParams.classesDir)
+            outputParams = KotlinCompilationUtils.JvmOutputParams(kaptParams.classesDir)
         ).also {
             it.freeArgs = sourcePaths
             it.pluginClasspaths = (it.pluginClasspaths ?: emptyArray()) + arrayOf(env.getResourcesPath())

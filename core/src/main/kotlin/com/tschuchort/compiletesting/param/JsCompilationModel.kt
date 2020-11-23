@@ -38,8 +38,4 @@ interface JsCompilationModel : CompilationModel {
      * process' classpaths
      */
     val kotlinStdLibJsJar: File?
-
-    // *.class files, Jars and resources (non-temporary) that are created by the
-    // compilation will land here
-    val outputDir get() = workingDir.resolve("output")
 }

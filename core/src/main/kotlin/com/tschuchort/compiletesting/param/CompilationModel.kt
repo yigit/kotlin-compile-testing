@@ -1,22 +1,20 @@
 package com.tschuchort.compiletesting.param
 
-import com.tschuchort.compiletesting.PluginOption
-import com.tschuchort.compiletesting.SourceFile
+import com.tschuchort.compiletesting.*
 import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import java.io.File
-import kotlin.reflect.KClass
 
-interface CompilationModel {
-    fun <T: Any> getExtensionData(key: KClass<T>): T?
+interface CompilationModel : HasExtensionData {
+    /**
+     * Used to get information from the host environment, like classpath or resources
+     */
+    val hostEnvironment : HostEnvironment
 
-    fun <T: Any> putExtensionData(key: KClass<T>, value: T)
-
-    fun <T: Any> getOrPutExtensionData(key: KClass<T>, build : () -> T) : T {
-        return getExtensionData(key) ?: build().also {
-            putExtensionData(key, it)
-        }
-    }
+    /**
+     * Utility class to log or capture logs of compilations.
+     */
+    val messageStream: MessageStream
 
     /**
      * Paths to directories or .jar files that contain classes

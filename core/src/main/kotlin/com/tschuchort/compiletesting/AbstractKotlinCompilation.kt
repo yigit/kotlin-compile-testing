@@ -36,10 +36,12 @@ abstract class AbstractKotlinCompilation<Model : CompilationModel>
         )
     }
 
-    internal fun runSteps() : StepRegistry.ExecutionResult {
+    internal fun runSteps(compilationModel:CompilationModel) : StepRegistry.ExecutionResult {
+
+
         val compilationUtils = KotlinCompilationUtils(
-            model.messageStream,
-            model.environment
+            compilationModel.messageStream,
+            compilationModel.hostEnvironment
         )
         /* Work around for warning that sometimes happens:
         "Failed to initialize native filesystem for Windows
@@ -50,9 +52,9 @@ abstract class AbstractKotlinCompilation<Model : CompilationModel>
         return withSystemProperty("idea.use.native.fs.for.win", "false") {
             @Suppress("UNCHECKED_CAST")
             stepRegistry.execute(
-                env = model.environment,
+                env = compilationModel.hostEnvironment,
                 compilationUtils = compilationUtils,
-                params = model as Model // TODO this is not nice but OK for now
+                params = compilationModel as Model // TODO this is not nice but OK for now
             )
         }
     }

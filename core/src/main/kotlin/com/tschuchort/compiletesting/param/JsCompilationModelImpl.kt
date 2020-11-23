@@ -40,12 +40,8 @@ internal class JsCompilationModelImpl : CompilationModelImpl(), JsCompilationMod
      * process' classpaths
      */
     override var kotlinStdLibJsJar: File? by default {
-        environment.findInHostClasspath("kotlin-stdlib-js.jar",
+        hostEnvironment.findInHostClasspath("kotlin-stdlib-js.jar",
             kotlinDependencyRegex("kotlin-stdlib-js")
         )
     }
-
-    // *.class files, Jars and resources (non-temporary) that are created by the
-    // compilation will land here
-    override val outputDir get() = workingDir.resolve("output")
 }

@@ -6,21 +6,12 @@ import org.jetbrains.kotlin.compiler.plugin.CommandLineProcessor
 import org.jetbrains.kotlin.compiler.plugin.ComponentRegistrar
 import java.io.File
 import java.nio.file.Files
-import kotlin.reflect.KClass
 
-internal abstract class CompilationModelImpl : CompilationModel {
-    internal val messageStream = MessageStream()
-    internal val environment = CompilationEnvironment(messageStream)
-
-
-    private val extensionData = mutableMapOf<KClass<*>, Any>()
-    override fun <T : Any> getExtensionData(key: KClass<T>): T? {
-        return extensionData[key] as? T
-    }
-
-    override fun <T : Any> putExtensionData(key: KClass<T>, value: T) {
-        extensionData[key] = value
-    }
+internal abstract class CompilationModelImpl : CompilationModel,
+    HasExtensionData by HasExtensionDataImpl() {
+    private val _messageStream = MessageStream()
+    override val messageStream = _messageStream
+    override val hostEnvironment = HostEnvironment(_messageStream)
 
     /** Working directory for the compilation */
     override var workingDir: File by default {
@@ -88,7 +79,7 @@ internal abstract class CompilationModelImpl : CompilationModel {
      * process' classpaths
      */
     override var kotlinStdLibCommonJar: File? by default {
-        environment.findInHostClasspath("kotlin-stdlib-common.jar",
+        hostEnvironment.findInHostClasspath("kotlin-stdlib-common.jar",
             kotlinDependencyRegex("kotlin-stdlib-common"))
     }
 }
