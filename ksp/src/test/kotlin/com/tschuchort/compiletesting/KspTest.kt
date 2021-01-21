@@ -1,5 +1,7 @@
 package com.tschuchort.compiletesting
 
+import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
@@ -194,6 +196,43 @@ class KspTest {
         assertThat(result).containsExactlyInAnyOrder(
             "JavaSubject", "KotlinSubject"
         )
+    }
+
+    @Test
+    fun resolveNestedClass() {
+        val javaSource = SourceFile.java(
+            "JavaSubject.java",
+            """
+            import java.util.List;
+            class JavaSubject {
+                int intField;
+                List<Integer> listOfInts;
+                List incompleteGeneric;
+                Nested nested;
+                static class Nested {
+                }
+            }
+            """.trimIndent()
+        )
+        val kotlinSource = SourceFile.kotlin(
+                "placeholder.kt",
+            ""
+        )
+        var nestedClassIsError: Boolean = true
+        val processor = object : AbstractTestSymbolProcessor() {
+            override fun process(resolver: Resolver) {
+                val decl = resolver.getClassDeclarationByName("JavaSubject")!!
+                nestedClassIsError = decl.getDeclaredProperties().single {
+                    it.simpleName.asString() == "nested"
+                }.type.resolve().isError
+            }
+        }
+        val compilation = KotlinCompilation().apply {
+            sources = listOf(javaSource, kotlinSource)
+            symbolProcessors += processor
+        }
+        compilation.compile()
+        assertThat(nestedClassIsError).isFalse()
     }
 
     internal open class ClassGeneratingProcessor(
