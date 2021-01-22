@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.config.JVMAssertionsMode
 import org.jetbrains.kotlin.config.JvmDefaultMode
 import org.jetbrains.kotlin.config.JvmTarget
 import org.jetbrains.kotlin.config.Services
+import org.jetbrains.kotlin.incremental.isJavaFile
 import org.jetbrains.kotlin.kapt3.base.incremental.DeclaredProcType
 import org.jetbrains.kotlin.kapt3.base.incremental.IncrementalProcessor
 import org.jetbrains.kotlin.kapt3.util.MessageCollectorBackedKaptLogger
@@ -466,7 +467,9 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 				kaptKotlinGeneratedDir.listFilesRecursively() +
 				kaptSourceDir.listFilesRecursively()
 
-		return compileKotlin(sources, K2JVMCompiler(), commonK2JVMArgs())
+		return compileKotlin(sources, K2JVMCompiler(), commonK2JVMArgs().also {
+			it.javaSourceRoots = arrayOf(sourcesDir.canonicalPath)
+		})
 	}
 
 	/**

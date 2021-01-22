@@ -369,6 +369,7 @@ class KotlinCompilationTests {
 			package package1;
 			public class JSource {
 				public void foo() {}
+				public static class Nested {}
 			}
 				""")
 
@@ -376,6 +377,7 @@ class KotlinCompilationTests {
 			package package2
 		    import package1.JSource
 			class KSource {
+				val nested = JSource.Nested()
 				fun bar() {
 					JSource().foo()
 				}
