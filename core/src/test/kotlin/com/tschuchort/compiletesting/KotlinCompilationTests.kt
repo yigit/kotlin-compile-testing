@@ -364,6 +364,34 @@ class KotlinCompilationTests {
 	}
 
 	@Test
+	fun `Kotlin can access Java class in different package`() {
+		val jSource = SourceFile.java("JSource.java", """
+			package package1;
+			class JSource {
+				void foo() {}
+			}
+				""")
+
+		val kSource = SourceFile.kotlin("KSource.kt", """
+			package package2
+		    import package1
+			class KSource {
+				fun bar() {
+					JSource().foo()
+				}
+			}
+				""")
+
+		val result = defaultCompilerConfig().apply {
+			sources = listOf(kSource, jSource)
+		}.compile()
+
+		assertThat(result.exitCode).isEqualTo(ExitCode.OK)
+		assertClassLoadable(result, "package2.KSource")
+		assertClassLoadable(result, "package1.JSource")
+	}
+
+	@Test
 	fun `Java can access Kotlin class`() {
 		val jSource = SourceFile.java("JSource.java", """
 			package com.tschuchort.compiletesting;
