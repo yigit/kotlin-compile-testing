@@ -367,14 +367,14 @@ class KotlinCompilationTests {
 	fun `Kotlin can access Java class in different package`() {
 		val jSource = SourceFile.java("JSource.java", """
 			package package1;
-			class JSource {
-				void foo() {}
+			public class JSource {
+				public void foo() {}
 			}
 				""")
 
 		val kSource = SourceFile.kotlin("KSource.kt", """
 			package package2
-		    import package1
+		    import package1.JSource
 			class KSource {
 				fun bar() {
 					JSource().foo()
