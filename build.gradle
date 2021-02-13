@@ -52,7 +52,9 @@ allprojects {
     apply plugin: 'java'
     apply plugin: 'idea'
     apply plugin: 'signing'
-    apply plugin: 'maven-publish'
+    if (project.name != "profiling") {
+        apply plugin: 'maven-publish'
+    }
 
     javadoc {
         if(JavaVersion.current().isJava9Compatible()) {
@@ -78,74 +80,75 @@ subprojects {
         from javadoc.destinationDir
     }
 
-    afterEvaluate {
-        archivesBaseName = POM_ARTIFACT_ID
-    }
+    if (project.pluginManager.hasPlugin("maven-publish")) {
+        afterEvaluate {
+            archivesBaseName = POM_ARTIFACT_ID
+        }
 
-    publishing {
-        publications {
-            mavenJava(MavenPublication) {
-                pom {
-                    groupId = GROUP
-                    artifactId = POM_ARTIFACT_ID
-                    version = VERSION_NAME
+        publishing {
+            publications {
+                mavenJava(MavenPublication) {
+                    pom {
+                        groupId = GROUP
+                        artifactId = POM_ARTIFACT_ID
+                        version = VERSION_NAME
 
-                    name = POM_NAME
-                    packaging = POM_PACKAGING
-                    description = POM_DESCRIPTION
-                    url = POM_URL
+                        name = POM_NAME
+                        packaging = POM_PACKAGING
+                        description = POM_DESCRIPTION
+                        url = POM_URL
 
-                    from components.java
-                    artifact sourcesJar
-                    artifact javadocJar
+                        from components.java
+                        artifact sourcesJar
+                        artifact javadocJar
 
-                    scm {
-                        url = POM_SCM_URL
-                        connection = POM_SCM_CONNECTION
-                        developerConnection = POM_SCM_DEV_CONNECTION
-                    }
-                    licenses {
-                        license {
-                            name = POM_LICENCE_NAME
-                            url = POM_LICENCE_URL
-                            distribution = POM_LICENCE_DIST
+                        scm {
+                            url = POM_SCM_URL
+                            connection = POM_SCM_CONNECTION
+                            developerConnection = POM_SCM_DEV_CONNECTION
                         }
-                    }
-                    developers {
-                        developer {
-                            id = POM_DEVELOPER_ID
-                            name = POM_DEVELOPER_NAME
+                        licenses {
+                            license {
+                                name = POM_LICENCE_NAME
+                                url = POM_LICENCE_URL
+                                distribution = POM_LICENCE_DIST
+                            }
+                        }
+                        developers {
+                            developer {
+                                id = POM_DEVELOPER_ID
+                                name = POM_DEVELOPER_NAME
+                            }
                         }
                     }
                 }
             }
-        }
-        repositories {
-            maven {
-                credentials {
-                    username "$System.env.SONATYPE_NEXUS_USERNAME"
-                    password "$System.env.SONATYPE_NEXUS_PASSWORD"
+            repositories {
+                maven {
+                    credentials {
+                        username "$System.env.SONATYPE_NEXUS_USERNAME"
+                        password "$System.env.SONATYPE_NEXUS_PASSWORD"
+                    }
+                    url = VERSION_NAME.endsWith('SNAPSHOT') ? SNAPSHOT_REPOSITORY : RELEASE_REPOSITORY
                 }
-                url = VERSION_NAME.endsWith('SNAPSHOT') ? SNAPSHOT_REPOSITORY : RELEASE_REPOSITORY
             }
         }
-    }
+        signing {
+            // Skip signing if publishing to mavenLocal and credentials are not available
+            required { !gradle.taskGraph.hasTask("publishToMavenLocal") && project.hasProperty("signing.keyId") }
 
-    signing {
-        // Skip signing if publishing to mavenLocal and credentials are not available
-        required { !gradle.taskGraph.hasTask("publishToMavenLocal") && project.hasProperty("signing.keyId") }
+            if (!project.hasProperty("signing.secretKeyRingFile") && !project.hasProperty("signing.password")) {
+                /* If in CI, the signing password and signing key are defined in the environment variables
+                 ORG_GRADLE_PROJECT_signingPassword and ORG_GRADLE_PROJECT_signingKey
+                 (https://blog.solidsoft.pl/2020/06/03/simpler-and-safer-artifact-signing-on-ci-server-with-gradle/,
+                 https://stackoverflow.com/questions/57921325/gradle-signarchives-unable-to-read-secret-key).
+                 Otherwise they are defined in the user's home directory gradle.properties.
+                 */
+                useInMemoryPgpKeys(findProperty("signingKey"), findProperty("signingPassword"))
+            }
 
-        if (!project.hasProperty("signing.secretKeyRingFile") && !project.hasProperty("signing.password")) {
-            /* If in CI, the signing password and signing key are defined in the environment variables
-             ORG_GRADLE_PROJECT_signingPassword and ORG_GRADLE_PROJECT_signingKey
-             (https://blog.solidsoft.pl/2020/06/03/simpler-and-safer-artifact-signing-on-ci-server-with-gradle/,
-             https://stackoverflow.com/questions/57921325/gradle-signarchives-unable-to-read-secret-key).
-             Otherwise they are defined in the user's home directory gradle.properties.
-             */
-            useInMemoryPgpKeys(findProperty("signingKey"), findProperty("signingPassword"))
+            sign publishing.publications.mavenJava
         }
-
-        sign publishing.publications.mavenJava
     }
 
     dependencies {

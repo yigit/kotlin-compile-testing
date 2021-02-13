@@ -1,0 +1,9 @@
+buildscript {
+    ext.ksp_version='1.4.20-dev-experimental-20210120'
+}
+
+dependencies {
+    testImplementation project(':core')
+    testImplementation project(':ksp')
+    testImplementation "com.google.devtools.ksp:symbol-processing-api:$ksp_version"
+}
