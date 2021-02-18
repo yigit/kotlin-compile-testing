@@ -53,33 +53,12 @@ class TimeTracking : TestRule {
         measurements: Map<ProfilingTest.TestConfiguration, List<Long>>
     ) {
         System.err.println("report for $testName")
-        System.err.println("use Google true:")
-
-        val groupedBy_enableClasspathCache = measurements.entries.groupBy {
-            it.key.enableClasspathCache
-        }
-        groupedBy_enableClasspathCache.entries.forEach { (key, value) ->
-            value.flatMap { it.value }.groupBy {
-                it
-            }
-        }
-
-        measurements.entries.filter {
-            it.key.useGoogleCompileTestingClasspath
-        }.groupBy {
-            it.key
+        measurements.mapValues {
+            analyze(it.value.removeOutliers())
+        }.entries.sortedBy {
+            it.value.avg
         }.forEach {
-            val analysis = analyze(it.value.flatMap { it.value }.removeOutliers())
-            System.err.println("${it.key}: ${analysis.toString()}")
-        }
-        System.err.println("use Google false:")
-        measurements.entries.filter {
-            !it.key.useGoogleCompileTestingClasspath
-        }.groupBy {
-            it.key
-        }.forEach {
-            val analysis = analyze(it.value.flatMap { it.value }.removeOutliers())
-            System.err.println("${it.key}: ${analysis.toString()}")
+            System.err.println("${it.key} (${it.value.avg}) : ${it.value}")
         }
     }
 
@@ -123,7 +102,6 @@ class TimeTracking : TestRule {
                 sources = listOf(SourceFile.kotlin("Foo.kt", ""))
                 annotationProcessors = listOf(ProfilingTest.DoNothingKapt())
                 symbolProcessors = listOf(ProfilingTest.DonothingKsp())
-                useCachedHostClasspath = true
             }.compile()
         }
         repeat(2) {
@@ -131,7 +109,6 @@ class TimeTracking : TestRule {
                 sources = listOf(SourceFile.kotlin("Foo.kt", ""))
                 annotationProcessors = listOf(ProfilingTest.DoNothingKapt())
                 symbolProcessors = listOf(ProfilingTest.DonothingKsp())
-                useMyClasspath = true
             }.compile()
         }
     }

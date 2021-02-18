@@ -4,6 +4,8 @@ import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
+import org.jetbrains.kotlin.cli.common.KOTLIN_COMPILER_ENVIRONMENT_KEEPALIVE_PROPERTY
+import org.junit.Before
 import org.junit.ClassRule
 import org.junit.Rule
 import org.junit.Test
@@ -30,13 +32,20 @@ class ProfilingTest(
         }
     }
 
+    @Before
+    fun setCompilerCache() {
+        val existingValue:String? = System.getProperty(KOTLIN_COMPILER_ENVIRONMENT_KEEPALIVE_PROPERTY)
+        System.setProperty(
+            KOTLIN_COMPILER_ENVIRONMENT_KEEPALIVE_PROPERTY,
+            if (testConfiguration.useCachedCompilerEnv) "true" else "false"
+        )
+    }
+
     private fun newKotlinCompilation() = KotlinCompilation().apply {
         when (testConfiguration.processorType) {
             ProcessorType.KAPT -> annotationProcessors = listOf(DoNothingKapt())
             ProcessorType.KSP -> symbolProcessors = listOf(DonothingKsp())
         }
-        useCachedHostClasspath = testConfiguration.enableClasspathCache
-        useMyClasspath = testConfiguration.useGoogleCompileTestingClasspath
         verbose = false
     }
 
@@ -109,24 +118,9 @@ class ProfilingTest(
 
     data class TestConfiguration(
         val processorType: ProcessorType,
-        val enableClasspathCache: Boolean,
-        val useGoogleCompileTestingClasspath: Boolean,
+        val useCachedCompilerEnv: Boolean
     ) {
-        companion object {
-            fun buildVariations(): List<TestConfiguration> {
-                return ProcessorType.values().flatMap { processorType ->
-                    arrayOf(true, false).flatMap { enableClasspathCache ->
-                         arrayOf(true, false).map { useGoogleCompileTestingClasspath ->
-                             TestConfiguration(
-                                 processorType = processorType,
-                                 enableClasspathCache = enableClasspathCache,
-                                 useGoogleCompileTestingClasspath = useGoogleCompileTestingClasspath
-                             )
-                         }
-                    }
-                }
-            }
-        }
+
     }
 
     companion object {
@@ -136,20 +130,11 @@ class ProfilingTest(
             listOf(
                 TestConfiguration(
                     processorType = ProcessorType.KAPT,
-                    enableClasspathCache = true,
-                    useGoogleCompileTestingClasspath = false
-                ),
-                TestConfiguration(
-                    processorType = ProcessorType.KAPT,
-                    enableClasspathCache = false,
-                    useGoogleCompileTestingClasspath = false
-                ),
-                TestConfiguration(
-                    processorType = ProcessorType.KAPT,
-                    enableClasspathCache = false,
-                    useGoogleCompileTestingClasspath = true
+                    useCachedCompilerEnv = false
                 )
             )
+        }.flatMap {
+            listOf(it, it.copy(useCachedCompilerEnv = true))
         }
 
         @get:ClassRule
