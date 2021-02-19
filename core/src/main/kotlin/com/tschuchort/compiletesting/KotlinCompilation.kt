@@ -46,6 +46,7 @@ typealias OptionValue = String
 
 @Suppress("MemberVisibilityCanBePrivate")
 class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
+	var useCustomCompiler = false
 	/** Arbitrary arguments to be passed to kapt */
 	var kaptArgs: MutableMap<OptionName, OptionValue> = mutableMapOf()
 
@@ -385,7 +386,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 			if (verbose)
 				it.flags.addAll(KaptFlag.MAP_DIAGNOSTIC_LOCATIONS, KaptFlag.VERBOSE)
 		}
-
+		KCTTimer.record("kapt options ready")
 		val compilerMessageCollector = PrintingMessageCollector(
 			internalMessageStream, MessageRenderer.GRADLE_STYLE, verbose
 		)
@@ -445,14 +446,15 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 		if (pluginClasspaths.isNotEmpty())
 			warn("Included plugins in pluginsClasspaths will be executed twice.")
-
+		KCTTimer.record("pre args buildup")
 		val k2JvmArgs = commonK2JVMArgs().also {
 			it.freeArgs = sourcePaths
 			it.pluginClasspaths = (it.pluginClasspaths ?: emptyArray()) + arrayOf(getResourcesPath())
 		}
+		KCTTimer.record("Args ready")
 
 		return convertKotlinExitCode(
-            K2JVMCompiler().exec(compilerMessageCollector, Services.EMPTY, k2JvmArgs)
+            createCompiler().exec(compilerMessageCollector, Services.EMPTY, k2JvmArgs)
 		)
 	}
 
@@ -462,7 +464,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 				kaptKotlinGeneratedDir.listFilesRecursively() +
 				kaptSourceDir.listFilesRecursively()
 
-		return compileKotlin(sources, K2JVMCompiler(), commonK2JVMArgs())
+		return compileKotlin(sources, createCompiler(), commonK2JVMArgs())
 	}
 
 	/**
@@ -515,7 +517,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 			val isJavac9OrLater = isJavac9OrLater(getJavacVersionString(javacCommand))
 			val javacArgs = baseJavacArgs(isJavac9OrLater)
-
+			KCTTimer.record("pre javac")
             val javacProc = ProcessBuilder(listOf(javacCommand) + javacArgs + javaSources.map(File::getAbsolutePath))
 					.directory(workingDir)
 					.redirectErrorStream(true)
@@ -524,11 +526,15 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 			javacProc.inputStream.copyTo(internalMessageStream)
 			javacProc.errorStream.copyTo(internalMessageStream)
 
-            return when(javacProc.waitFor()) {
-                0 -> ExitCode.OK
-                1 -> ExitCode.COMPILATION_ERROR
-                else -> ExitCode.INTERNAL_ERROR
-            }
+            return try {
+            	when(javacProc.waitFor()) {
+					0 -> ExitCode.OK
+					1 -> ExitCode.COMPILATION_ERROR
+					else -> ExitCode.INTERNAL_ERROR
+				}
+			} finally {
+			    KCTTimer.record("done javac")
+			}
         }
         else {
             /*  If no JDK is given, we will use the host process' system java compiler
@@ -590,6 +596,8 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 	/** Runs the compilation task */
 	fun compile(): Result {
+		KCTTimer.reset()
+		KCTTimer.record("BEGIN KCT compilation")
 		// make sure all needed directories exist
 		sourcesDir.mkdirs()
 		classesDir.mkdirs()
@@ -598,8 +606,10 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 		kaptIncrementalDataDir.mkdirs()
 		kaptKotlinGeneratedDir.mkdirs()
 
+
 		// write given sources to working directory
 		val sourceFiles = sources.map { it.writeIfNeeded(sourcesDir) }
+		KCTTimer.record("sources resady")
 
 		pluginClasspaths.forEach { filepath ->
 			if (!filepath.exists()) {
@@ -630,6 +640,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 					return makeResult(exitCode)
 				}
 			} finally {
+				KCTTimer.record("stubs done")
 				MainComponentRegistrar.threadLocalParameters.remove()
 			}
 
@@ -639,10 +650,17 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 					return makeResult(exitCode)
 				}
 			}
+			KCTTimer.record("kotlin compilation done")
 		}
 
 		// step 4: compile Java files
-		return makeResult(compileJava(sourceFiles))
+		return try {
+			val exitCode = compileJava(sourceFiles)
+			KCTTimer.record("javac ompilation done")
+			makeResult(exitCode)
+		} finally {
+		    KCTTimer.record("all compilation done")
+		}
 	}
 
 	private fun makeResult(exitCode: ExitCode): Result {
@@ -665,6 +683,12 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 			log("Inheriting classpaths:  " + hostClasspaths.joinToString(File.pathSeparator))
 		}
 	}.distinct()
+	
+	fun createCompiler() = if (useCustomCompiler) {
+		FastKotlinCompiler()
+	} else {
+		K2JVMCompiler()
+	}
 
 	companion object {
 		const val OPTION_KAPT_KOTLIN_GENERATED = "kapt.kotlin.generated"

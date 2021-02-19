@@ -32,36 +32,30 @@ class ProfilingTest(
         }
     }
 
-    @Before
-    fun setCompilerCache() {
-        val existingValue:String? = System.getProperty(KOTLIN_COMPILER_ENVIRONMENT_KEEPALIVE_PROPERTY)
-        System.setProperty(
-            KOTLIN_COMPILER_ENVIRONMENT_KEEPALIVE_PROPERTY,
-            if (testConfiguration.useCachedCompilerEnv) "true" else "false"
-        )
-    }
-
     private fun newKotlinCompilation() = KotlinCompilation().apply {
         when (testConfiguration.processorType) {
             ProcessorType.KAPT -> annotationProcessors = listOf(DoNothingKapt())
             ProcessorType.KSP -> symbolProcessors = listOf(DonothingKsp())
         }
+        useCustomCompiler = testConfiguration.useCustomCompiler
         verbose = false
     }
 
     @Test
     fun emptyKotlinFile() {
-        newKotlinCompilation().apply {
+        val result = newKotlinCompilation().apply {
             sources = listOf(SourceFile.kotlin("Foo.kt", ""))
         }.compile()
+        check(result.exitCode == KotlinCompilation.ExitCode.OK)
     }
 
     @Test
     fun emptyKotlinFile_withInheritedClasspath() {
-        newKotlinCompilation().apply {
+        val result = newKotlinCompilation().apply {
             sources = listOf(SourceFile.kotlin("Foo.kt", ""))
             inheritClassPath = true
         }.compile()
+        check(result.exitCode == KotlinCompilation.ExitCode.OK)
     }
 
     val javaSources = (0..5).map {
@@ -76,17 +70,19 @@ class ProfilingTest(
     }
     @Test
     fun manySources() {
-        newKotlinCompilation().apply {
+        val result = newKotlinCompilation().apply {
             sources = javaSources + kotlinSources
         }.compile()
+        check(result.exitCode == KotlinCompilation.ExitCode.OK)
     }
 
     @Test
     fun manySources_inheritClasspath() {
-        newKotlinCompilation().apply {
+        val result = newKotlinCompilation().apply {
             sources = javaSources + kotlinSources
             inheritClassPath = true
         }.compile()
+        check(result.exitCode == KotlinCompilation.ExitCode.OK)
     }
 
     class DoNothingKapt : AbstractProcessor() {
@@ -118,7 +114,7 @@ class ProfilingTest(
 
     data class TestConfiguration(
         val processorType: ProcessorType,
-        val useCachedCompilerEnv: Boolean
+        val useCustomCompiler: Boolean
     ) {
 
     }
@@ -126,16 +122,18 @@ class ProfilingTest(
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
-        fun params() = (0 until 30).flatMap {
+        fun params() = (0 until 5).flatMap {
             listOf(
                 TestConfiguration(
                     processorType = ProcessorType.KAPT,
-                    useCachedCompilerEnv = false
+                    useCustomCompiler = false
+                ),
+                TestConfiguration(
+                    processorType = ProcessorType.KAPT,
+                    useCustomCompiler = true
                 )
             )
-        }.flatMap {
-            listOf(it, it.copy(useCachedCompilerEnv = true))
-        }
+        }.filter { it.useCustomCompiler == true }
 
         @get:ClassRule
         @JvmStatic

@@ -24,6 +24,9 @@ class TimeTracking : TestRule {
         recordings.getOrPut(key) {
             mutableListOf()
         }.add(nanos)
+        System.err.println(
+            "\ntest results for:${testName}:\n ${KCTTimer.dump()}\n\n"
+        )
     }
     fun printReport() {
         System.err.println("measurements:")
