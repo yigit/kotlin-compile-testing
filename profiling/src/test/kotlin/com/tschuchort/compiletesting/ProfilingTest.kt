@@ -4,8 +4,6 @@ import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
-import org.jetbrains.kotlin.cli.common.KOTLIN_COMPILER_ENVIRONMENT_KEEPALIVE_PROPERTY
-import org.junit.Before
 import org.junit.ClassRule
 import org.junit.Rule
 import org.junit.Test
@@ -37,7 +35,8 @@ class ProfilingTest(
             ProcessorType.KAPT -> annotationProcessors = listOf(DoNothingKapt())
             ProcessorType.KSP -> symbolProcessors = listOf(DonothingKsp())
         }
-        useCustomCompiler = testConfiguration.useCustomCompiler
+
+        useInProcessJavaCompiler = testConfiguration.useInProcessJavac
         verbose = false
     }
 
@@ -46,7 +45,9 @@ class ProfilingTest(
         val result = newKotlinCompilation().apply {
             sources = listOf(SourceFile.kotlin("Foo.kt", ""))
         }.compile()
-        check(result.exitCode == KotlinCompilation.ExitCode.OK)
+        check(result.exitCode == KotlinCompilation.ExitCode.OK) {
+            result.messages
+        }
     }
 
     @Test
@@ -55,7 +56,9 @@ class ProfilingTest(
             sources = listOf(SourceFile.kotlin("Foo.kt", ""))
             inheritClassPath = true
         }.compile()
-        check(result.exitCode == KotlinCompilation.ExitCode.OK)
+        check(result.exitCode == KotlinCompilation.ExitCode.OK) {
+            result.messages
+        }
     }
 
     val javaSources = (0..5).map {
@@ -73,7 +76,9 @@ class ProfilingTest(
         val result = newKotlinCompilation().apply {
             sources = javaSources + kotlinSources
         }.compile()
-        check(result.exitCode == KotlinCompilation.ExitCode.OK)
+        check(result.exitCode == KotlinCompilation.ExitCode.OK) {
+            result.messages
+        }
     }
 
     @Test
@@ -82,7 +87,9 @@ class ProfilingTest(
             sources = javaSources + kotlinSources
             inheritClassPath = true
         }.compile()
-        check(result.exitCode == KotlinCompilation.ExitCode.OK)
+        check(result.exitCode == KotlinCompilation.ExitCode.OK) {
+            result.messages
+        }
     }
 
     class DoNothingKapt : AbstractProcessor() {
@@ -114,7 +121,7 @@ class ProfilingTest(
 
     data class TestConfiguration(
         val processorType: ProcessorType,
-        val useCustomCompiler: Boolean
+        val useInProcessJavac:Boolean
     ) {
 
     }
@@ -122,18 +129,18 @@ class ProfilingTest(
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
-        fun params() = (0 until 5).flatMap {
+        fun params() = (0 until 1).flatMap {
             listOf(
                 TestConfiguration(
                     processorType = ProcessorType.KAPT,
-                    useCustomCompiler = false
+                    useInProcessJavac = false
                 ),
                 TestConfiguration(
                     processorType = ProcessorType.KAPT,
-                    useCustomCompiler = true
+                    useInProcessJavac = true
                 )
             )
-        }.filter { it.useCustomCompiler == true }
+        }
 
         @get:ClassRule
         @JvmStatic

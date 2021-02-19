@@ -42,7 +42,7 @@ object KCTTimer {
         start = now()
     }
     fun record(name: String) {
-        recordings.add(name to now())
+        //recordings.add(name to now())
     }
 
     fun dump() = buildString {

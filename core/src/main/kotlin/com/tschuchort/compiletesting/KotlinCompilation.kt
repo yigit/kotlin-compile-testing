@@ -47,6 +47,7 @@ typealias OptionValue = String
 @Suppress("MemberVisibilityCanBePrivate")
 class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 	var useCustomCompiler = false
+	var useInProcessJavaCompiler = false
 	/** Arbitrary arguments to be passed to kapt */
 	var kaptArgs: MutableMap<OptionName, OptionValue> = mutableMapOf()
 
@@ -505,7 +506,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 		if(javaSources.isEmpty())
 			return ExitCode.OK
 
-        if(jdkHome != null) {
+        if(!useInProcessJavaCompiler && jdkHome != null) {
             /* If a JDK home is given, try to run javac from there so it uses the same JDK
                as K2JVMCompiler. Changing the JDK of the system java compiler via the
                "--system" and "-bootclasspath" options is not so easy. */
@@ -537,6 +538,8 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 			}
         }
         else {
+        	TODO("not supported case")
+        	KCTTimer.record("being in process javac")
             /*  If no JDK is given, we will use the host process' system java compiler
                 and erase the bootclasspath. The user is then on their own to somehow
                 provide the JDK classes via the regular classpath because javac won't
@@ -544,11 +547,15 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 			val isJavac9OrLater = isJdk9OrLater()
 			val javacArgs = baseJavacArgs(isJavac9OrLater).apply {
-				// erase bootclasspath or JDK path because no JDK was specified
-				if (isJavac9OrLater)
-					addAll("--system", "none")
-				else
-					addAll("-bootclasspath", "")
+				addAll("-verbose")
+				if (true ||!useInProcessJavaCompiler) {
+					// erase bootclasspath or JDK path because no JDK was specified
+					if (isJavac9OrLater)
+						addAll("--system", "none")
+					else
+						addAll("-bootclasspath", "")
+				}
+
 			}
 
             log("jdkHome is null. Using system java compiler of the host process.")
@@ -566,31 +573,37 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
                 }
             }
 
-            try {
-                val noErrors = javac.getTask(
-                    OutputStreamWriter(internalMessageStream), javaFileManager,
-                    diagnosticCollector, javacArgs,
-                    /* classes to be annotation processed */ null,
-					javaSources.map { FileJavaFileObject(it) }
-						.filter { it.kind == JavaFileObject.Kind.SOURCE }
-                ).call()
+			try {
+				try {
+					val noErrors = javac.getTask(
+						OutputStreamWriter(internalMessageStream), javaFileManager,
+						diagnosticCollector, javacArgs,
+						/* classes to be annotation processed */ null,
+						javaSources.map { FileJavaFileObject(it) }
+							.filter { it.kind == JavaFileObject.Kind.SOURCE }
+					).call()
 
-                printDiagnostics()
+					printDiagnostics()
 
-                return if(noErrors)
-                    ExitCode.OK
-                else
-                    ExitCode.COMPILATION_ERROR
-            }
-            catch (e: Exception) {
-                if(e is RuntimeException || e is IllegalArgumentException) {
-                    printDiagnostics()
-                    error(e.toString())
-                    return ExitCode.INTERNAL_ERROR
-                }
-                else
-                    throw e
-            }
+					return if(noErrors)
+						ExitCode.OK
+					else
+						ExitCode.COMPILATION_ERROR
+				}
+				catch (e: Exception) {
+					if(e is RuntimeException || e is IllegalArgumentException) {
+						printDiagnostics()
+						error(e.toString())
+						return ExitCode.INTERNAL_ERROR
+					}
+					else
+						throw e
+				}
+			} finally {
+
+				KCTTimer.record("end in process java compilation")
+			}
+
         }
 	}
 
